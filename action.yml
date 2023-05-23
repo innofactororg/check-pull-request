@@ -1,0 +1,31 @@
+name: "Pull Request Check"
+author: "Innofactor Plc"
+description: "Check a pull request before another action is allowed, like for example auto merge"
+inputs:
+  require_code_owner:
+    description: "Check that actor is code owner."
+    required: false
+    default: true
+  require_code_owner_review:
+    description: "Check that at least one code owner has reviewed and approved the pull request."
+    required: false
+    default: true
+  require_code_team_review:
+    description: "Check that a code team user has reviewed and approved the pull request."
+    required: false
+    default: true
+  required_mergeable_state:
+    description: "Check that the pull request mergable state is in one of the specified states."
+    required: false
+    default: |-
+      ["clean","has_hooks","unstable"]
+  token:
+    description: The GitHub token for checking the pull request, defaults to using secrets.GITHUB_TOKEN.
+    required: false
+    default: ${{ github.token }}
+runs:
+  using: node16
+  main: dist/index.js
+branding:
+  icon: check-square
+  color: blue
