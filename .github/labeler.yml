@@ -1,0 +1,8 @@
+area/distribution:
+- "dist/**/*"
+area/github:
+- ".github/**/*"
+area/source:
+- "src/**/*"
+area/vscode:
+- ".vscode/**/*"
