@@ -21,7 +21,7 @@ const core_1 = __nccwpck_require__(2186);
 const github_1 = __nccwpck_require__(5438);
 const rest_1 = __nccwpck_require__(5375);
 const helper_1 = __nccwpck_require__(3947);
-const checkPullRequest = ({ pullNumber, requireActorIsCodeOwner, requireCodeOwnerReview, requireCodeTeamReview, requiredMergeableState, token }) => __awaiter(void 0, void 0, void 0, function* () {
+const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCodeOwner, requireCodeOwnerReview, requireCodeTeamsFile, requireCodeTeamReview, requiredMergeableState, token }) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { owner, repo } = github_1.context.repo;
     const { actor } = github_1.context;
@@ -36,23 +36,30 @@ const checkPullRequest = ({ pullNumber, requireActorIsCodeOwner, requireCodeOwne
             let codeOwnerEntries = [];
             let files = [];
             const prUser = (_b = pr === null || pr === void 0 ? void 0 : pr.user) === null || _b === void 0 ? void 0 : _b.login;
-            if (requireActorIsCodeOwner || requireCodeOwnerReview) {
+            if (requireCodeOwnersFile ||
+                requireActorIsCodeOwner ||
+                requireCodeOwnerReview) {
                 codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr === null || pr === void 0 ? void 0 : pr.base.sha);
+                if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
+                    const message = `Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch. About code owners: https://t.ly/8KUb`;
+                    (0, core_1.setOutput)('message', message);
+                    throw new Error(message);
+                }
                 files = yield HelperApi.getPullFiles(owner, repo, pullNumber);
                 if (requireActorIsCodeOwner) {
-                    if (codeOwnerEntries) {
-                        if (files) {
-                            const isOwner = yield HelperApi.isActorOwner(actor, files, codeOwnerEntries);
-                            if (!isOwner) {
-                                throw new Error(`User ${actor} don't own all the changed files of pull request ${pullNumber}.`);
-                            }
-                        }
-                        else {
-                            (0, core_1.notice)(`Could not find any changed files in pull request ${pullNumber}. This is unexpected.`);
+                    if (codeOwnerEntries.length === 0) {
+                        (0, core_1.notice)(`Found no CODEOWNERS file in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`);
+                    }
+                    else if (files) {
+                        const isOwner = yield HelperApi.isActorOwner(actor, files, codeOwnerEntries);
+                        if (!isOwner) {
+                            const message = `User ${actor} don't own all the changed files of pull request ${pullNumber}.`;
+                            (0, core_1.setOutput)('message', message);
+                            throw new Error(message);
                         }
                     }
                     else {
-                        (0, core_1.notice)(`A CODEOWNERS file is missing in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`);
+                        (0, core_1.notice)(`Could not find any changed files in pull request ${pullNumber}. This is unexpected.`);
                     }
                 }
             }
@@ -60,41 +67,46 @@ const checkPullRequest = ({ pullNumber, requireActorIsCodeOwner, requireCodeOwne
                 const owners = yield HelperApi.getPullCodeOwners(files, codeOwnerEntries);
                 const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, owners, prUser);
                 if (!hasReview) {
-                    throw new Error(`Pull request ${pullNumber} has not been approved by a code owner.`);
+                    const message = `Pull request ${pullNumber} has not been approved by a code owner.`;
+                    (0, core_1.setOutput)('message', message);
+                    throw new Error(message);
                 }
             }
-            if (requireCodeTeamReview) {
+            if (requireCodeTeamsFile || requireCodeTeamReview) {
                 const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr === null || pr === void 0 ? void 0 : pr.base.sha);
-                if (codeTeamEntries) {
-                    const labels = yield HelperApi.getLabelsOnIssue(owner, repo, pullNumber);
-                    if (!labels) {
-                        throw new Error(`Pull request ${pullNumber} has no labels, but a CODETEAMS file exist and a code team review is required. Please add labels according to CODETEAMS file.`);
-                    }
-                    let pullUser = '';
-                    // loop through each of the CODETEAM lines
-                    for (const entry of codeTeamEntries) {
-                        // if label in CODETEAM line don't exist in PR labels
-                        if (labels.findIndex(e => e.name === entry.label) === -1) {
-                            throw new Error(`The CODETEAMS file has label ${entry.label}, but the pull request ${pullNumber} don't. Please add the label to the pull request.`);
-                        }
-                        // CODETEAM label exist in PR
-                        // if only one team member user in CODETEAM line then prUser can be approver
-                        pullUser = 'skipPrUserTest';
-                        // if not only one team member user in CODETEAM line
-                        if (entry.users.length !== 1) {
-                            // approver that opened the pull request (prUser) will be ignored
-                            pullUser = prUser;
-                        }
-                        // check if a CODETEAM user has reviewed
-                        const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, entry.users, pullUser);
-                        // if a CODETEAM user has not reviewed
-                        if (!hasReview) {
-                            throw new Error(`Pull request ${pullNumber} has not been approved by a code team user (${entry.users.join(',')}) for label ${entry.label}.`);
-                        }
-                    }
+                if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
+                    const message = `Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch.`;
+                    (0, core_1.setOutput)('message', message);
+                    throw new Error(message);
+                }
+                if (codeTeamEntries.length === 0) {
+                    (0, core_1.notice)(`A CODETEAMS file is missing in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`);
                 }
                 else {
-                    (0, core_1.notice)(`A CODETEAMS file is missing in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`);
+                    const labels = yield HelperApi.getLabelsOnIssue(owner, repo, pullNumber);
+                    if (!labels) {
+                        const message = `Pull request ${pullNumber} has no labels, but a code team review is required. Please add label according to the CODETEAMS file.`;
+                        (0, core_1.setOutput)('message', message);
+                        throw new Error(message);
+                    }
+                    let pullUser = '';
+                    for (const entry of codeTeamEntries) {
+                        if (labels.findIndex(e => e.name === entry.label) === -1) {
+                            const message = `Found required label ${entry.label} in the CODETEAMS file. Please add the label to pull request ${pullNumber} and request a review.`;
+                            (0, core_1.setOutput)('message', message);
+                            throw new Error(message);
+                        }
+                        pullUser = 'skipPrUserTest';
+                        if (entry.users.length !== 1) {
+                            pullUser = prUser;
+                        }
+                        const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, entry.users, pullUser);
+                        if (!hasReview) {
+                            const message = `Pull request ${pullNumber} has not been approved by a ${entry.label} code team user (${entry.users.join(',')}).`;
+                            (0, core_1.setOutput)('message', message);
+                            throw new Error(message);
+                        }
+                    }
                 }
             }
             if (requiredMergeableState && requiredMergeableState.length > 0) {
@@ -102,59 +114,66 @@ const checkPullRequest = ({ pullNumber, requireActorIsCodeOwner, requireCodeOwne
                     (0, core_1.info)(`Pull request ${pullNumber} is merged.`);
                 }
                 else if (pr.mergeable === null) {
-                    throw new Error(`The mergable state of pull request ${pullNumber} is unknown.`);
+                    const message = `The mergable state of pull request ${pullNumber} is unknown.`;
+                    (0, core_1.setOutput)('message', message);
+                    throw new Error(message);
                 }
                 else if (pr.mergeable) {
-                    let message = '';
+                    let merge_message = '';
                     switch (pr.mergeable_state) {
                         case 'clean':
-                            message = 'is in a clean state';
+                            merge_message = 'is in a clean state';
                             break;
                         case 'has_hooks':
-                            message = 'has a passing commit status with pre-receive hooks';
+                            merge_message =
+                                'has a passing commit status with pre-receive hooks';
                             break;
                         case 'unstable':
-                            message = 'has a non-passing commit status (unstable)';
+                            merge_message = 'has a non-passing commit status (unstable)';
                             break;
                         case 'behind':
-                            message = 'has out of date head ref';
+                            merge_message = 'has out of date head ref';
                             break;
                         case 'blocked':
-                            message = 'is blocked';
+                            merge_message = 'is blocked';
                             break;
                         case 'dirty':
-                            message = 'is dirty, the merge commit cannot be cleanly created';
+                            merge_message =
+                                'is dirty, the merge commit cannot be cleanly created';
                             break;
                         case 'draft':
-                            message = 'is blocked due to the pull request being a draft';
+                            merge_message = 'is blocked due to the pull request being a draft';
                             break;
                         default:
-                            message = 'is in a undetermined state';
+                            merge_message = 'is in a undetermined state';
                             break;
                     }
                     if (requiredMergeableState.includes(pr.mergeable_state)) {
-                        (0, core_1.info)(`Pull request ${pullNumber} ${message}.`);
+                        (0, core_1.info)(`Pull request ${pullNumber} ${merge_message}.`);
                     }
                     else {
-                        throw new Error(`Pull request ${pullNumber} ${message}.`);
+                        const message = `Pull request ${pullNumber} ${merge_message}.`;
+                        (0, core_1.setOutput)('message', message);
+                        throw new Error(message);
                     }
                 }
                 else {
-                    throw new Error(`Pull request ${pullNumber} is not mergable.`);
+                    const message = `Pull request ${pullNumber} is not mergable.`;
+                    (0, core_1.setOutput)('message', message);
+                    throw new Error(message);
                 }
             }
         }
         else {
-            throw new Error(`Unable to get pull request ${pullNumber}.`);
+            const message = `Unable to get pull request ${pullNumber}.`;
+            (0, core_1.setOutput)('message', message);
+            throw new Error(message);
         }
     }
     catch (error) {
-        if (error instanceof Error) {
-            throw new Error(`Failed to check pull request: ${error.message} (${error.name})`);
-        }
-        else {
-            throw new Error(`Failed to check pull request: ${JSON.stringify(error)}`);
-        }
+        const message = `Failed to check pull request: ${JSON.stringify(error)}`;
+        (0, core_1.setOutput)('message', message);
+        throw new Error(message);
     }
 });
 exports.checkPullRequest = checkPullRequest;
@@ -190,7 +209,7 @@ class Helper {
     getPull(owner, repo, pullNumber) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                (0, core_1.info)(`Get pull request ${pullNumber}:`);
+                (0, core_1.info)(`Get pull request ${pullNumber}.`);
                 const { data } = yield this.octokit.rest.pulls.get({
                     owner,
                     repo,
@@ -199,14 +218,16 @@ class Helper {
                 return data;
             }
             catch (error) {
-                throw new Error(`Failed to get pull request ${pullNumber}: ${JSON.stringify(error)}`);
+                const message = `Failed to get pull request ${pullNumber}: ${JSON.stringify(error)}`;
+                (0, core_1.setOutput)('message', message);
+                throw new Error(message);
             }
         });
     }
     getPullFiles(owner, repo, pullNumber) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                (0, core_1.info)(`Get files in pull request ${pullNumber}:`);
+                (0, core_1.info)(`Get files in pull request ${pullNumber}.`);
                 const { data } = yield this.octokit.rest.pulls.listFiles({
                     owner,
                     repo,
@@ -217,14 +238,16 @@ class Helper {
                 return fileStrings;
             }
             catch (error) {
-                throw new Error(`Failed to get files in pull request ${pullNumber}: ${JSON.stringify(error)}`);
+                const message = `Failed to get files in pull request ${pullNumber}: ${JSON.stringify(error)}`;
+                (0, core_1.setOutput)('message', message);
+                throw new Error(message);
             }
         });
     }
     getPullReviews(owner, repo, pullNumber) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                (0, core_1.info)(`Get reviews for pull request ${pullNumber}:`);
+                (0, core_1.info)(`Get reviews for pull request ${pullNumber}.`);
                 const { data } = yield this.octokit.rest.pulls.listReviews({
                     owner,
                     repo,
@@ -234,14 +257,16 @@ class Helper {
                 return data;
             }
             catch (error) {
-                throw new Error(`Failed to get reviews for pull request ${pullNumber}: ${JSON.stringify(error)}`);
+                const message = `Failed to get reviews for pull request ${pullNumber}: ${JSON.stringify(error)}`;
+                (0, core_1.setOutput)('message', message);
+                throw new Error(message);
             }
         });
     }
     getLabelsOnIssue(owner, repo, issueNumber) {
         return __awaiter(this, void 0, void 0, function* () {
             try {
-                (0, core_1.info)(`Get labels for issue ${issueNumber}:`);
+                (0, core_1.info)(`Get labels for issue ${issueNumber}.`);
                 const { data } = yield this.octokit.rest.issues.listLabelsOnIssue({
                     owner,
                     repo,
@@ -251,7 +276,9 @@ class Helper {
                 return data;
             }
             catch (error) {
-                throw new Error(`Failed to get labels for issue ${issueNumber}: ${JSON.stringify(error)}`);
+                const message = `Failed to get labels for issue ${issueNumber}: ${JSON.stringify(error)}`;
+                (0, core_1.setOutput)('message', message);
+                throw new Error(message);
             }
         });
     }
@@ -274,16 +301,18 @@ class Helper {
                         path: file,
                         ref
                     });
-                    (0, core_1.info)(`Found: ${file}`);
+                    (0, core_1.info)(`- Found: ${file}`);
                     contentObject = response.data;
                     break;
                 }
                 catch (error) {
                     if (error instanceof Error && error.message.includes('Not Found')) {
-                        (0, core_1.info)(`Not found: ${file}`);
+                        (0, core_1.info)(`- Not found: ${file}`);
                     }
                     else {
-                        throw new Error(`Failed to get CODEOWNERS file: ${JSON.stringify(error)}`);
+                        const message = `Failed to get CODEOWNERS file: ${JSON.stringify(error)}`;
+                        (0, core_1.setOutput)('message', message);
+                        throw new Error(message);
                     }
                 }
             }
@@ -316,6 +345,7 @@ class Helper {
                 'docs/CODETEAMS'
             ];
             let contentObject;
+            const codeTeamEntries = [];
             for (const file of files) {
                 try {
                     const response = yield this.octokit.rest.repos.getContent({
@@ -324,21 +354,22 @@ class Helper {
                         path: file,
                         ref
                     });
-                    (0, core_1.info)(`Found: ${file}`);
+                    (0, core_1.info)(`- Found: ${file}`);
                     contentObject = response.data;
                     break;
                 }
                 catch (error) {
                     if (error instanceof Error && error.message.includes('Not Found')) {
-                        (0, core_1.info)(`Not found: ${file}`);
+                        (0, core_1.info)(`- Not found: ${file}`);
                     }
                     else {
-                        throw new Error(`Failed to get CODETEAMS file: ${JSON.stringify(error)}`);
+                        const message = `Failed to get CODETEAMS file: ${JSON.stringify(error)}`;
+                        (0, core_1.setOutput)('message', message);
+                        throw new Error(message);
                     }
                 }
             }
             if (contentObject && contentObject.content) {
-                const codeTeamEntries = [];
                 const content = JSON.parse(Buffer.from(contentObject.content, contentObject.encoding).toString());
                 const lines = content.split(/\r\n|\r|\n/);
                 for (const line of lines) {
@@ -350,6 +381,9 @@ class Helper {
                 }
                 return codeTeamEntries.reverse();
             }
+            else {
+                return codeTeamEntries;
+            }
         });
     }
     getPullCodeOwners(files, codeOwnerEntries) {
@@ -360,8 +394,15 @@ class Helper {
                 for (const entry of codeOwnerEntries) {
                     if (entry.match(relativePath)) {
                         for (const owner of entry.owners) {
-                            if (owner.startsWith('@')) {
+                            if (owner.includes('/')) {
+                                (0, core_1.notice)(`Owner ${owner} is a team. This owner will be ignored.`);
+                            }
+                            else if (owner.startsWith('@')) {
+                                (0, core_1.info)(`Owner ${owner} is a code owner of ${relativePath}.`);
                                 owners.push(owner);
+                            }
+                            else {
+                                (0, core_1.notice)(`Owner ${owner} don't start with @. This owner will be ignored.`);
                             }
                         }
                     }
@@ -455,8 +496,10 @@ function run() {
     var _a, _b, _c;
     return __awaiter(this, void 0, void 0, function* () {
         try {
+            const requireCodeOwnersFile = JSON.parse((0, core_1.getInput)('require_codeowners_file', { required: true }).toLowerCase());
             const requireActorIsCodeOwner = JSON.parse((0, core_1.getInput)('require_code_owner', { required: true }).toLowerCase());
             const requireCodeOwnerReview = JSON.parse((0, core_1.getInput)('require_code_owner_review', { required: true }).toLowerCase());
+            const requireCodeTeamsFile = JSON.parse((0, core_1.getInput)('require_codeteams_file', { required: true }).toLowerCase());
             const requireCodeTeamReview = JSON.parse((0, core_1.getInput)('require_code_team_review', { required: true }).toLowerCase());
             const requiredMergeableStateInput = (0, core_1.getInput)('required_mergeable_state', {
                 required: true
@@ -471,8 +514,10 @@ function run() {
             }
             yield (0, check_pr_1.checkPullRequest)({
                 pullNumber,
+                requireCodeOwnersFile,
                 requireActorIsCodeOwner,
                 requireCodeOwnerReview,
+                requireCodeTeamsFile,
                 requireCodeTeamReview,
                 requiredMergeableState,
                 token

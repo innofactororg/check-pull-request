@@ -2,6 +2,10 @@ name: "Pull Request Check"
 author: "Innofactor Plc"
 description: "Check a pull request before another action is allowed, like for example auto merge"
 inputs:
+  require_codeowners_file:
+    description: "Require a CODEOWNERS file."
+    required: false
+    default: false
   require_code_owner:
     description: "Check that actor is code owner."
     required: false
@@ -10,6 +14,10 @@ inputs:
     description: "Check that at least one code owner has reviewed and approved the pull request."
     required: false
     default: true
+  require_codeteams_file:
+    description: "Require a CODETEAMS file."
+    required: false
+    default: false
   require_code_team_review:
     description: "Check that a code team user has reviewed and approved the pull request."
     required: false

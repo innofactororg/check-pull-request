@@ -1,4 +1,4 @@
-import {info} from '@actions/core'
+import {info, notice, setOutput} from '@actions/core'
 import {Octokit, RestEndpointMethodTypes} from '@octokit/rest'
 import ignore from 'ignore'
 
@@ -30,7 +30,7 @@ export class Helper {
     pullNumber: number
   ): Promise<PullRequest | null> {
     try {
-      info(`Get pull request ${pullNumber}:`)
+      info(`Get pull request ${pullNumber}.`)
       const {data} = await this.octokit.rest.pulls.get({
         owner,
         repo,
@@ -38,9 +38,11 @@ export class Helper {
       })
       return data
     } catch (error: unknown) {
-      throw new Error(
-        `Failed to get pull request ${pullNumber}: ${JSON.stringify(error)}`
-      )
+      const message = `Failed to get pull request ${pullNumber}: ${JSON.stringify(
+        error
+      )}`
+      setOutput('message', message)
+      throw new Error(message)
     }
   }
 
@@ -50,7 +52,7 @@ export class Helper {
     pullNumber: number
   ): Promise<string[]> {
     try {
-      info(`Get files in pull request ${pullNumber}:`)
+      info(`Get files in pull request ${pullNumber}.`)
       const {data} = await this.octokit.rest.pulls.listFiles({
         owner,
         repo,
@@ -60,11 +62,11 @@ export class Helper {
       const fileStrings = data.map(f => `/${f.filename}`)
       return fileStrings
     } catch (error: unknown) {
-      throw new Error(
-        `Failed to get files in pull request ${pullNumber}: ${JSON.stringify(
-          error
-        )}`
-      )
+      const message = `Failed to get files in pull request ${pullNumber}: ${JSON.stringify(
+        error
+      )}`
+      setOutput('message', message)
+      throw new Error(message)
     }
   }
 
@@ -74,7 +76,7 @@ export class Helper {
     pullNumber: number
   ): Promise<ReviewComments | null> {
     try {
-      info(`Get reviews for pull request ${pullNumber}:`)
+      info(`Get reviews for pull request ${pullNumber}.`)
       const {data} = await this.octokit.rest.pulls.listReviews({
         owner,
         repo,
@@ -83,11 +85,11 @@ export class Helper {
       })
       return data
     } catch (error: unknown) {
-      throw new Error(
-        `Failed to get reviews for pull request ${pullNumber}: ${JSON.stringify(
-          error
-        )}`
-      )
+      const message = `Failed to get reviews for pull request ${pullNumber}: ${JSON.stringify(
+        error
+      )}`
+      setOutput('message', message)
+      throw new Error(message)
     }
   }
 
@@ -97,7 +99,7 @@ export class Helper {
     issueNumber: number
   ): Promise<IssueLabels | null> {
     try {
-      info(`Get labels for issue ${issueNumber}:`)
+      info(`Get labels for issue ${issueNumber}.`)
       const {data} = await this.octokit.rest.issues.listLabelsOnIssue({
         owner,
         repo,
@@ -106,11 +108,11 @@ export class Helper {
       })
       return data
     } catch (error: unknown) {
-      throw new Error(
-        `Failed to get labels for issue ${issueNumber}: ${JSON.stringify(
-          error
-        )}`
-      )
+      const message = `Failed to get labels for issue ${issueNumber}: ${JSON.stringify(
+        error
+      )}`
+      setOutput('message', message)
+      throw new Error(message)
     }
   }
 
@@ -136,16 +138,18 @@ export class Helper {
           path: file,
           ref
         })
-        info(`Found: ${file}`)
+        info(`- Found: ${file}`)
         contentObject = response.data
         break
       } catch (error: unknown) {
         if (error instanceof Error && error.message.includes('Not Found')) {
-          info(`Not found: ${file}`)
+          info(`- Not found: ${file}`)
         } else {
-          throw new Error(
-            `Failed to get CODEOWNERS file: ${JSON.stringify(error)}`
-          )
+          const message = `Failed to get CODEOWNERS file: ${JSON.stringify(
+            error
+          )}`
+          setOutput('message', message)
+          throw new Error(message)
         }
       }
     }
@@ -176,7 +180,7 @@ export class Helper {
     owner: string,
     repo: string,
     ref: string
-  ): Promise<CodeTeamEntry[] | undefined> {
+  ): Promise<CodeTeamEntry[]> {
     info('Get CODETEAMS file:')
     const files: string[] = [
       'CODETEAMS',
@@ -185,6 +189,7 @@ export class Helper {
       'docs/CODETEAMS'
     ]
     let contentObject: RepoContent | undefined
+    const codeTeamEntries: CodeTeamEntry[] = []
     for (const file of files) {
       try {
         const response = await this.octokit.rest.repos.getContent({
@@ -193,21 +198,22 @@ export class Helper {
           path: file,
           ref
         })
-        info(`Found: ${file}`)
+        info(`- Found: ${file}`)
         contentObject = response.data
         break
       } catch (error: unknown) {
         if (error instanceof Error && error.message.includes('Not Found')) {
-          info(`Not found: ${file}`)
+          info(`- Not found: ${file}`)
         } else {
-          throw new Error(
-            `Failed to get CODETEAMS file: ${JSON.stringify(error)}`
-          )
+          const message = `Failed to get CODETEAMS file: ${JSON.stringify(
+            error
+          )}`
+          setOutput('message', message)
+          throw new Error(message)
         }
       }
     }
     if (contentObject && (contentObject as {content: string}).content) {
-      const codeTeamEntries: CodeTeamEntry[] = []
       const content = JSON.parse(
         Buffer.from(
           (contentObject as {content: string}).content,
@@ -223,6 +229,8 @@ export class Helper {
         codeTeamEntries.push({label, users})
       }
       return codeTeamEntries.reverse()
+    } else {
+      return codeTeamEntries
     }
   }
 
@@ -236,8 +244,15 @@ export class Helper {
       for (const entry of codeOwnerEntries) {
         if (entry.match(relativePath)) {
           for (const owner of entry.owners) {
-            if (owner.startsWith('@')) {
+            if (owner.includes('/')) {
+              notice(`Owner ${owner} is a team. This owner will be ignored.`)
+            } else if (owner.startsWith('@')) {
+              info(`Owner ${owner} is a code owner of ${relativePath}.`)
               owners.push(owner)
+            } else {
+              notice(
+                `Owner ${owner} don't start with @. This owner will be ignored.`
+              )
             }
           }
         }

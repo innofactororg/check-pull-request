@@ -1,4 +1,4 @@
-import {info, notice} from '@actions/core'
+import {info, notice, setOutput} from '@actions/core'
 import {context} from '@actions/github'
 import {Octokit} from '@octokit/rest'
 import {Helper} from './helper'
@@ -11,15 +11,19 @@ interface CodeOwnerEntry {
 
 export const checkPullRequest = async ({
   pullNumber,
+  requireCodeOwnersFile,
   requireActorIsCodeOwner,
   requireCodeOwnerReview,
+  requireCodeTeamsFile,
   requireCodeTeamReview,
   requiredMergeableState,
   token
 }: Readonly<{
   pullNumber: number
+  requireCodeOwnersFile: boolean
   requireActorIsCodeOwner: boolean
   requireCodeOwnerReview: boolean
+  requireCodeTeamsFile: boolean
   requireCodeTeamReview: boolean
   requiredMergeableState: string[] | undefined
   token: string
@@ -38,34 +42,41 @@ export const checkPullRequest = async ({
       let codeOwnerEntries: CodeOwnerEntry[] = []
       let files: string[] = []
       const prUser = pr?.user?.login
-      if (requireActorIsCodeOwner || requireCodeOwnerReview) {
+      if (
+        requireCodeOwnersFile ||
+        requireActorIsCodeOwner ||
+        requireCodeOwnerReview
+      ) {
         codeOwnerEntries = await HelperApi.getCodeOwners(
           owner,
           repo,
           pr?.base.sha
         )
+        if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
+          const message = `Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr?.base.ref} branch. About code owners: https://t.ly/8KUb`
+          setOutput('message', message)
+          throw new Error(message)
+        }
         files = await HelperApi.getPullFiles(owner, repo, pullNumber)
         if (requireActorIsCodeOwner) {
-          if (codeOwnerEntries) {
-            if (files) {
-              const isOwner = await HelperApi.isActorOwner(
-                actor,
-                files,
-                codeOwnerEntries
-              )
-              if (!isOwner) {
-                throw new Error(
-                  `User ${actor} don't own all the changed files of pull request ${pullNumber}.`
-                )
-              }
-            } else {
-              notice(
-                `Could not find any changed files in pull request ${pullNumber}. This is unexpected.`
-              )
+          if (codeOwnerEntries.length === 0) {
+            notice(
+              `Found no CODEOWNERS file in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`
+            )
+          } else if (files) {
+            const isOwner = await HelperApi.isActorOwner(
+              actor,
+              files,
+              codeOwnerEntries
+            )
+            if (!isOwner) {
+              const message = `User ${actor} don't own all the changed files of pull request ${pullNumber}.`
+              setOutput('message', message)
+              throw new Error(message)
             }
           } else {
             notice(
-              `A CODEOWNERS file is missing in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`
+              `Could not find any changed files in pull request ${pullNumber}. This is unexpected.`
             )
           }
         }
@@ -83,46 +94,48 @@ export const checkPullRequest = async ({
           prUser
         )
         if (!hasReview) {
-          throw new Error(
-            `Pull request ${pullNumber} has not been approved by a code owner.`
-          )
+          const message = `Pull request ${pullNumber} has not been approved by a code owner.`
+          setOutput('message', message)
+          throw new Error(message)
         }
       }
-      if (requireCodeTeamReview) {
+      if (requireCodeTeamsFile || requireCodeTeamReview) {
         const codeTeamEntries = await HelperApi.getCodeTeams(
           owner,
           repo,
           pr?.base.sha
         )
-        if (codeTeamEntries) {
+        if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
+          const message = `Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr?.base.ref} branch.`
+          setOutput('message', message)
+          throw new Error(message)
+        }
+        if (codeTeamEntries.length === 0) {
+          notice(
+            `A CODETEAMS file is missing in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`
+          )
+        } else {
           const labels = await HelperApi.getLabelsOnIssue(
             owner,
             repo,
             pullNumber
           )
           if (!labels) {
-            throw new Error(
-              `Pull request ${pullNumber} has no labels, but a CODETEAMS file exist and a code team review is required. Please add labels according to CODETEAMS file.`
-            )
+            const message = `Pull request ${pullNumber} has no labels, but a code team review is required. Please add label according to the CODETEAMS file.`
+            setOutput('message', message)
+            throw new Error(message)
           }
           let pullUser = ''
-          // loop through each of the CODETEAM lines
           for (const entry of codeTeamEntries) {
-            // if label in CODETEAM line don't exist in PR labels
             if (labels.findIndex(e => e.name === entry.label) === -1) {
-              throw new Error(
-                `The CODETEAMS file has label ${entry.label}, but the pull request ${pullNumber} don't. Please add the label to the pull request.`
-              )
+              const message = `Found required label ${entry.label} in the CODETEAMS file. Please add the label to pull request ${pullNumber} and request a review.`
+              setOutput('message', message)
+              throw new Error(message)
             }
-            // CODETEAM label exist in PR
-            // if only one team member user in CODETEAM line then prUser can be approver
             pullUser = 'skipPrUserTest'
-            // if not only one team member user in CODETEAM line
             if (entry.users.length !== 1) {
-              // approver that opened the pull request (prUser) will be ignored
               pullUser = prUser
             }
-            // check if a CODETEAM user has reviewed
             const hasReview = await HelperApi.isReviewed(
               owner,
               repo,
@@ -130,75 +143,74 @@ export const checkPullRequest = async ({
               entry.users,
               pullUser
             )
-            // if a CODETEAM user has not reviewed
             if (!hasReview) {
-              throw new Error(
-                `Pull request ${pullNumber} has not been approved by a code team user (${entry.users.join(
-                  ','
-                )}) for label ${entry.label}.`
-              )
+              const message = `Pull request ${pullNumber} has not been approved by a ${
+                entry.label
+              } code team user (${entry.users.join(',')}).`
+              setOutput('message', message)
+              throw new Error(message)
             }
           }
-        } else {
-          notice(
-            `A CODETEAMS file is missing in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`
-          )
         }
       }
       if (requiredMergeableState && requiredMergeableState.length > 0) {
         if (pr.merged) {
           info(`Pull request ${pullNumber} is merged.`)
         } else if (pr.mergeable === null) {
-          throw new Error(
-            `The mergable state of pull request ${pullNumber} is unknown.`
-          )
+          const message = `The mergable state of pull request ${pullNumber} is unknown.`
+          setOutput('message', message)
+          throw new Error(message)
         } else if (pr.mergeable) {
-          let message = ''
+          let merge_message = ''
           switch (pr.mergeable_state) {
             case 'clean':
-              message = 'is in a clean state'
+              merge_message = 'is in a clean state'
               break
             case 'has_hooks':
-              message = 'has a passing commit status with pre-receive hooks'
+              merge_message =
+                'has a passing commit status with pre-receive hooks'
               break
             case 'unstable':
-              message = 'has a non-passing commit status (unstable)'
+              merge_message = 'has a non-passing commit status (unstable)'
               break
             case 'behind':
-              message = 'has out of date head ref'
+              merge_message = 'has out of date head ref'
               break
             case 'blocked':
-              message = 'is blocked'
+              merge_message = 'is blocked'
               break
             case 'dirty':
-              message = 'is dirty, the merge commit cannot be cleanly created'
+              merge_message =
+                'is dirty, the merge commit cannot be cleanly created'
               break
             case 'draft':
-              message = 'is blocked due to the pull request being a draft'
+              merge_message = 'is blocked due to the pull request being a draft'
               break
             default:
-              message = 'is in a undetermined state'
+              merge_message = 'is in a undetermined state'
               break
           }
           if (requiredMergeableState.includes(pr.mergeable_state)) {
-            info(`Pull request ${pullNumber} ${message}.`)
+            info(`Pull request ${pullNumber} ${merge_message}.`)
           } else {
-            throw new Error(`Pull request ${pullNumber} ${message}.`)
+            const message = `Pull request ${pullNumber} ${merge_message}.`
+            setOutput('message', message)
+            throw new Error(message)
           }
         } else {
-          throw new Error(`Pull request ${pullNumber} is not mergable.`)
+          const message = `Pull request ${pullNumber} is not mergable.`
+          setOutput('message', message)
+          throw new Error(message)
         }
       }
     } else {
-      throw new Error(`Unable to get pull request ${pullNumber}.`)
+      const message = `Unable to get pull request ${pullNumber}.`
+      setOutput('message', message)
+      throw new Error(message)
     }
   } catch (error: unknown) {
-    if (error instanceof Error) {
-      throw new Error(
-        `Failed to check pull request: ${error.message} (${error.name})`
-      )
-    } else {
-      throw new Error(`Failed to check pull request: ${JSON.stringify(error)}`)
-    }
+    const message = `Failed to check pull request: ${JSON.stringify(error)}`
+    setOutput('message', message)
+    throw new Error(message)
   }
 }
