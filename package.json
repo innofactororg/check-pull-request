@@ -1,6 +1,6 @@
 {
   "name": "github-action-check-pull",
-  "version": "1.0.0",
+  "version": "1.0.2",
   "description": "Check a pull request before another action is allowed, like for example auto merge.",
   "main": "lib/main.js",
   "scripts": {
@@ -31,7 +31,6 @@
     "@actions/core": "^1.10.0",
     "@actions/github": "^5.1.1",
     "@octokit/rest": "^19.0.10",
-    "ensure-error": "^4.0.0",
     "ignore": "^5.2.4"
   },
   "devDependencies": {

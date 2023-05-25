@@ -1,5 +1,6 @@
-import {info, notice, setOutput} from '@actions/core'
+import {info, notice, setOutput, setFailed} from '@actions/core'
 import {Octokit, RestEndpointMethodTypes} from '@octokit/rest'
+import {RequestError} from '@octokit/request-error'
 import ignore from 'ignore'
 
 type PullRequest = RestEndpointMethodTypes['pulls']['get']['response']['data']
@@ -9,6 +10,10 @@ type IssueLabels =
   RestEndpointMethodTypes['issues']['listLabelsOnIssue']['response']['data']
 type RepoContent =
   RestEndpointMethodTypes['repos']['getContent']['response']['data']
+
+type ErrorWithMessage = {
+  message: string
+}
 
 interface CodeOwnerEntry {
   path: string
@@ -21,6 +26,66 @@ interface CodeTeamEntry {
   users: string[]
 }
 
+function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'message' in error &&
+    typeof (error as Record<string, unknown>).message === 'string'
+  )
+}
+
+function getErrorString(error: unknown): string {
+  if (isErrorWithMessage(error)) return error.message
+  try {
+    return JSON.stringify(error)
+  } catch {
+    return String(error)
+  }
+}
+
+export function processError(
+  error: unknown,
+  fail = false,
+  message?: string
+): string {
+  let errorMessage = getErrorString(error)
+  let returnMessage = ''
+  if (message && errorMessage !== '') {
+    returnMessage = `${message} ${errorMessage}`
+  } else if (message) {
+    returnMessage = message
+  } else if (errorMessage !== '') {
+    returnMessage = errorMessage
+  }
+  errorMessage = ''
+  if (error instanceof RequestError) {
+    errorMessage = `HTTP response code ${error.status} for ${error.request.method} request to ${error.request.url}.`
+    if (error.response?.data) {
+      errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(
+        error.response.data,
+        undefined,
+        2
+      )}`
+    }
+    if (error.stack) {
+      errorMessage = `${errorMessage}\nStack:\n${error.stack}`
+    }
+  } else if (error instanceof Error && error.stack) {
+    errorMessage = `Stack:\n${error.stack}`
+  }
+  if (returnMessage !== '' && errorMessage !== '') {
+    returnMessage = `${returnMessage}\n${errorMessage}`
+  } else if (errorMessage !== '') {
+    returnMessage = errorMessage
+  }
+  if (fail) {
+    setOutput('message', returnMessage)
+    setFailed(returnMessage)
+  }
+  return returnMessage
+}
+
 export class Helper {
   constructor(private octokit: Octokit) {}
 
@@ -29,21 +94,13 @@ export class Helper {
     repo: string,
     pullNumber: number
   ): Promise<PullRequest | null> {
-    try {
-      info(`Get pull request ${pullNumber}.`)
-      const {data} = await this.octokit.rest.pulls.get({
-        owner,
-        repo,
-        pull_number: pullNumber
-      })
-      return data
-    } catch (error: unknown) {
-      const message = `Failed to get pull request ${pullNumber}: ${JSON.stringify(
-        error
-      )}`
-      setOutput('message', message)
-      throw new Error(message)
-    }
+    info(`Get pull request ${pullNumber}.`)
+    const {data} = await this.octokit.rest.pulls.get({
+      owner,
+      repo,
+      pull_number: pullNumber
+    })
+    return data
   }
 
   async getPullFiles(
@@ -51,23 +108,15 @@ export class Helper {
     repo: string,
     pullNumber: number
   ): Promise<string[]> {
-    try {
-      info(`Get files in pull request ${pullNumber}.`)
-      const {data} = await this.octokit.rest.pulls.listFiles({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        per_page: 100
-      })
-      const fileStrings = data.map(f => `/${f.filename}`)
-      return fileStrings
-    } catch (error: unknown) {
-      const message = `Failed to get files in pull request ${pullNumber}: ${JSON.stringify(
-        error
-      )}`
-      setOutput('message', message)
-      throw new Error(message)
-    }
+    info(`Get files in pull request ${pullNumber}.`)
+    const {data} = await this.octokit.rest.pulls.listFiles({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      per_page: 100
+    })
+    const fileStrings = data.map(f => `/${f.filename}`)
+    return fileStrings
   }
 
   async getPullReviews(
@@ -75,22 +124,14 @@ export class Helper {
     repo: string,
     pullNumber: number
   ): Promise<ReviewComments | null> {
-    try {
-      info(`Get reviews for pull request ${pullNumber}.`)
-      const {data} = await this.octokit.rest.pulls.listReviews({
-        owner,
-        repo,
-        pull_number: pullNumber,
-        per_page: 100
-      })
-      return data
-    } catch (error: unknown) {
-      const message = `Failed to get reviews for pull request ${pullNumber}: ${JSON.stringify(
-        error
-      )}`
-      setOutput('message', message)
-      throw new Error(message)
-    }
+    info(`Get reviews for pull request ${pullNumber}.`)
+    const {data} = await this.octokit.rest.pulls.listReviews({
+      owner,
+      repo,
+      pull_number: pullNumber,
+      per_page: 100
+    })
+    return data
   }
 
   async getLabelsOnIssue(
@@ -98,22 +139,14 @@ export class Helper {
     repo: string,
     issueNumber: number
   ): Promise<IssueLabels | null> {
-    try {
-      info(`Get labels for issue ${issueNumber}.`)
-      const {data} = await this.octokit.rest.issues.listLabelsOnIssue({
-        owner,
-        repo,
-        issue_number: issueNumber,
-        per_page: 100
-      })
-      return data
-    } catch (error: unknown) {
-      const message = `Failed to get labels for issue ${issueNumber}: ${JSON.stringify(
-        error
-      )}`
-      setOutput('message', message)
-      throw new Error(message)
-    }
+    info(`Get labels for issue ${issueNumber}.`)
+    const {data} = await this.octokit.rest.issues.listLabelsOnIssue({
+      owner,
+      repo,
+      issue_number: issueNumber,
+      per_page: 100
+    })
+    return data
   }
 
   async getCodeOwners(
@@ -142,14 +175,12 @@ export class Helper {
         contentObject = response.data
         break
       } catch (error: unknown) {
-        if (error instanceof Error && error.message.includes('Not Found')) {
+        if (error instanceof RequestError && error.status === 404) {
           info(`- Not found: ${file}`)
         } else {
-          const message = `Failed to get CODEOWNERS file: ${JSON.stringify(
-            error
-          )}`
-          setOutput('message', message)
-          throw new Error(message)
+          throw new Error(
+            processError(error, false, 'Failed to get CODEOWNERS file')
+          )
         }
       }
     }
@@ -202,14 +233,12 @@ export class Helper {
         contentObject = response.data
         break
       } catch (error: unknown) {
-        if (error instanceof Error && error.message.includes('Not Found')) {
+        if (error instanceof RequestError && error.status === 404) {
           info(`- Not found: ${file}`)
         } else {
-          const message = `Failed to get CODETEAMS file: ${JSON.stringify(
-            error
-          )}`
-          setOutput('message', message)
-          throw new Error(message)
+          throw new Error(
+            processError(error, false, 'Failed to get CODETEAMS file')
+          )
         }
       }
     }
