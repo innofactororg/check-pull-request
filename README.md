@@ -21,14 +21,23 @@ jobs:
     - name: Check Pull Request
       uses: innofactororg/github-action-check-pull@v1
       with:
-        # Check that actor is code owner.
+        # Require a CODEOWNERS file.
         #
-        # For the check to run, the repository must have a CODEOWNERS file in
-        # either the root, docs/, or .github/ directory of the repository.
-        # https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+        # The check will fail if the repository don't have a CODEOWNERS file in
+        # either the root, docs/, or .github/ directory.
+        # About code owners: https://t.ly/8KUb
         #
         # The CODEOWNERS file is retrieved from the base branch of a
         # pull request (e.g. main), so it can be protected.
+        #
+        # Default: false
+        require_codeowners_file: false
+
+        # Check that actor is code owner.
+        #
+        # Without a CODEOWNERS file, everyone is considered a code owner.
+        # The check will fail if the actor (the user that initiated this check)
+        # is not a code owner.
         #
         # Default: true
         require_code_owner: true
@@ -37,8 +46,21 @@ jobs:
         # The code owner can't be the user who opened the pull request, unless
         # the user is the only owner.
         #
+        # Note: This action will ignore emails and teams specified in CODEOWNERS file.
+        #
         # Default: true
         require_code_owner_review: true
+
+        # Require a CODETEAMS file.
+        #
+        # The check will fail if the repository don't have a CODETEAMS file in
+        # either the root, docs/, or .github/ directory.
+        #
+        # The CODETEAMS file is retrieved from the base branch of a
+        # pull request (e.g. main), so it can be protected.
+        #
+        # Default: false
+        require_codeteams_file: false
 
         # Check that a code team member has reviewed and approved the pull request.
         # The code team member can't be the user who opened the pull request, unless
@@ -46,9 +68,6 @@ jobs:
         #
         # For the check to run, the repository must have a CODETEAMS file in
         # either the root, docs/, or .github/ directory of the repository.
-        #
-        # The CODETEAMS file is retrieved from the base branch of a
-        # pull request (e.g. main), so it can be protected.
         #
         # Default: true
         require_code_team_review: true

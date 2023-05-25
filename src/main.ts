@@ -6,11 +6,17 @@ import {checkPullRequest} from './check-pr'
 
 async function run(): Promise<void> {
   try {
+    const requireCodeOwnersFile = JSON.parse(
+      getInput('require_codeowners_file', {required: true}).toLowerCase()
+    ) as boolean
     const requireActorIsCodeOwner = JSON.parse(
       getInput('require_code_owner', {required: true}).toLowerCase()
     ) as boolean
     const requireCodeOwnerReview = JSON.parse(
       getInput('require_code_owner_review', {required: true}).toLowerCase()
+    ) as boolean
+    const requireCodeTeamsFile = JSON.parse(
+      getInput('require_codeteams_file', {required: true}).toLowerCase()
     ) as boolean
     const requireCodeTeamReview = JSON.parse(
       getInput('require_code_team_review', {required: true}).toLowerCase()
@@ -34,8 +40,10 @@ async function run(): Promise<void> {
 
     await checkPullRequest({
       pullNumber,
+      requireCodeOwnersFile,
       requireActorIsCodeOwner,
       requireCodeOwnerReview,
+      requireCodeTeamsFile,
       requireCodeTeamReview,
       requiredMergeableState,
       token
