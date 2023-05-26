@@ -38,8 +38,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
         if (requireCodeOwnersFile ||
             requireActorIsCodeOwner ||
             requireCodeOwnerReview) {
-            codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr.base.ref //pr?.base.sha
-            );
+            codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr.base.ref);
             if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
                 throw new Error(`Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch. About code owners: https://t.ly/8KUb`);
             }
@@ -67,8 +66,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
             }
         }
         if (requireCodeTeamsFile || requireCodeTeamReview) {
-            const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr.base.ref //pr?.base.sha
-            );
+            const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr.base.ref);
             if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
                 throw new Error(`Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch.`);
             }
@@ -224,14 +222,24 @@ function processError(error, fail = false, message) {
     if (error instanceof request_error_1.RequestError) {
         errorMessage = `HTTP response code ${error.status} from ${error.request.method} ${error.request.url}.`;
         if ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) {
-            errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(error.response.data, undefined, 2)}`;
+            try {
+                errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(error.response.data, undefined, 2)}`;
+            }
+            catch (_b) {
+                errorMessage = `${errorMessage}\nResponse body:\n${error.response.data}`;
+            }
         }
     }
     else if (isOctokitTypesRequestError(error)) {
         errorMessage = `HTTP response code ${error.status}. ${error.documentation_url}`;
         if (error.errors && error.errors.length > 0) {
             for (const e of error.errors) {
-                errorMessage = `${errorMessage}\n${JSON.stringify(e, undefined, 2)}`;
+                if (e.message) {
+                    errorMessage = `${errorMessage}\n${e.message} (${e.code} ${e.field} ${e.resource})`;
+                }
+                else {
+                    errorMessage = `${errorMessage}\n${e.code} ${e.field} ${e.resource}`;
+                }
             }
         }
     }
@@ -330,7 +338,7 @@ class Helper {
     }
     getCodeOwners(owner, repo, ref) {
         return __awaiter(this, void 0, void 0, function* () {
-            (0, core_1.info)(`Look for CODEOWNERS file in ref ${ref} of repo ${repo}.`);
+            (0, core_1.info)(`Look for CODEOWNERS file in ${ref} branch.`);
             const files = [
                 'CODEOWNERS',
                 '.github/CODEOWNERS',
@@ -360,7 +368,7 @@ class Helper {
     }
     getCodeTeams(owner, repo, ref) {
         return __awaiter(this, void 0, void 0, function* () {
-            (0, core_1.info)(`Look for CODETEAMS file in ref ${ref} of repo ${repo}.`);
+            (0, core_1.info)(`Look for CODETEAMS file in ${ref} branch.`);
             const files = [
                 'CODETEAMS',
                 '.github/CODETEAMS',

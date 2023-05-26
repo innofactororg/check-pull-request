@@ -46,11 +46,7 @@ export const checkPullRequest = async ({
       requireActorIsCodeOwner ||
       requireCodeOwnerReview
     ) {
-      codeOwnerEntries = await HelperApi.getCodeOwners(
-        owner,
-        repo,
-        pr.base.ref //pr?.base.sha
-      )
+      codeOwnerEntries = await HelperApi.getCodeOwners(owner, repo, pr.base.ref)
       if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
         throw new Error(
           `Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr?.base.ref} branch. About code owners: https://t.ly/8KUb`
@@ -99,7 +95,7 @@ export const checkPullRequest = async ({
       const codeTeamEntries = await HelperApi.getCodeTeams(
         owner,
         repo,
-        pr.base.ref //pr?.base.sha
+        pr.base.ref
       )
       if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
         throw new Error(

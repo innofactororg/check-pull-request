@@ -89,17 +89,25 @@ export function processError(
   if (error instanceof OctokitRequestError) {
     errorMessage = `HTTP response code ${error.status} from ${error.request.method} ${error.request.url}.`
     if (error.response?.data) {
-      errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(
-        error.response.data,
-        undefined,
-        2
-      )}`
+      try {
+        errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(
+          error.response.data,
+          undefined,
+          2
+        )}`
+      } catch {
+        errorMessage = `${errorMessage}\nResponse body:\n${error.response.data}`
+      }
     }
   } else if (isOctokitTypesRequestError(error)) {
     errorMessage = `HTTP response code ${error.status}. ${error.documentation_url}`
     if (error.errors && error.errors.length > 0) {
       for (const e of error.errors) {
-        errorMessage = `${errorMessage}\n${JSON.stringify(e, undefined, 2)}`
+        if (e.message) {
+          errorMessage = `${errorMessage}\n${e.message} (${e.code} ${e.field} ${e.resource})`
+        } else {
+          errorMessage = `${errorMessage}\n${e.code} ${e.field} ${e.resource}`
+        }
       }
     }
   } else if (isErrorWithStatus(error)) {
@@ -218,7 +226,7 @@ export class Helper {
     repo: string,
     ref: string
   ): Promise<CodeOwnerEntry[]> {
-    info(`Look for CODEOWNERS file in ref ${ref} of repo ${repo}.`)
+    info(`Look for CODEOWNERS file in ${ref} branch.`)
     const files: string[] = [
       'CODEOWNERS',
       '.github/CODEOWNERS',
@@ -251,7 +259,7 @@ export class Helper {
     repo: string,
     ref: string
   ): Promise<CodeTeamEntry[]> {
-    info(`Look for CODETEAMS file in ref ${ref} of repo ${repo}.`)
+    info(`Look for CODETEAMS file in ${ref} branch.`)
     const files: string[] = [
       'CODETEAMS',
       '.github/CODETEAMS',
