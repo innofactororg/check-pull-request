@@ -288,7 +288,7 @@ export class Helper {
         if (entry.match(relativePath)) {
           for (const owner of entry.owners) {
             if (owner.includes('/')) {
-              notice(`Owner ${owner} is a team. This owner will be ignored.`)
+              notice(`Owner ${owner} is a team. Teams will be ignored.`)
             } else if (owner.startsWith('@')) {
               info(`Owner ${owner} is a code owner of ${relativePath}.`)
               owners.push(owner)
@@ -358,9 +358,13 @@ export class Helper {
             (owners.length === 1 && owners.includes(`@${reviewer}`)) ||
             (owners.includes(`@${reviewer}`) && prUser !== reviewer))
         ) {
+          info(`Pull request ${pullNumber} was approved by ${reviewer}.`)
           return true
         }
       }
+      info(`Pull request ${pullNumber} has not been approved.`)
+    } else {
+      notice(`Pull request ${pullNumber} has no reviews.`)
     }
     return false
   }

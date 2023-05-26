@@ -393,7 +393,7 @@ class Helper {
                     if (entry.match(relativePath)) {
                         for (const owner of entry.owners) {
                             if (owner.includes('/')) {
-                                (0, core_1.notice)(`Owner ${owner} is a team. This owner will be ignored.`);
+                                (0, core_1.notice)(`Owner ${owner} is a team. Teams will be ignored.`);
                             }
                             else if (owner.startsWith('@')) {
                                 (0, core_1.info)(`Owner ${owner} is a code owner of ${relativePath}.`);
@@ -455,9 +455,14 @@ class Helper {
                         (owners.length === 0 ||
                             (owners.length === 1 && owners.includes(`@${reviewer}`)) ||
                             (owners.includes(`@${reviewer}`) && prUser !== reviewer))) {
+                        (0, core_1.info)(`Pull request ${pullNumber} was approved by ${reviewer}.`);
                         return true;
                     }
                 }
+                (0, core_1.info)(`Pull request ${pullNumber} has not been approved.`);
+            }
+            else {
+                (0, core_1.notice)(`Pull request ${pullNumber} has no reviews.`);
             }
             return false;
         });
