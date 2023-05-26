@@ -1,6 +1,7 @@
 import {info, notice, setOutput, setFailed} from '@actions/core'
 import {Octokit, RestEndpointMethodTypes} from '@octokit/rest'
-import {RequestError} from '@octokit/request-error'
+import {RequestError as OctokitTypesRequestError} from '@octokit/types'
+import {RequestError as OctokitRequestError} from '@octokit/request-error'
 import ignore from 'ignore'
 
 type PullRequest = RestEndpointMethodTypes['pulls']['get']['response']['data']
@@ -8,11 +9,13 @@ type ReviewComments =
   RestEndpointMethodTypes['pulls']['listReviews']['response']['data']
 type IssueLabels =
   RestEndpointMethodTypes['issues']['listLabelsOnIssue']['response']['data']
-type RepoContent =
-  RestEndpointMethodTypes['repos']['getContent']['response']['data']
 
 type ErrorWithMessage = {
   message: string
+}
+
+type ErrorWithStatus = {
+  status: number
 }
 
 interface CodeOwnerEntry {
@@ -32,6 +35,30 @@ function isErrorWithMessage(error: unknown): error is ErrorWithMessage {
     error !== null &&
     'message' in error &&
     typeof (error as Record<string, unknown>).message === 'string'
+  )
+}
+
+function isErrorWithStatus(error: unknown): error is ErrorWithStatus {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'status' in error &&
+    typeof (error as Record<string, unknown>).status === 'number'
+  )
+}
+
+function isOctokitTypesRequestError(
+  error: unknown
+): error is OctokitTypesRequestError {
+  return (
+    typeof error === 'object' &&
+    error !== null &&
+    'name' in error &&
+    typeof (error as Record<string, unknown>).name === 'string' &&
+    'status' in error &&
+    typeof (error as Record<string, unknown>).status === 'number' &&
+    'documentation_url' in error &&
+    typeof (error as Record<string, unknown>).documentation_url === 'string'
   )
 }
 
@@ -59,8 +86,8 @@ export function processError(
     returnMessage = errorMessage
   }
   errorMessage = ''
-  if (error instanceof RequestError) {
-    errorMessage = `HTTP response code ${error.status} for ${error.request.method} request to ${error.request.url}.`
+  if (error instanceof OctokitRequestError) {
+    errorMessage = `HTTP response code ${error.status} from ${error.request.method} ${error.request.url}.`
     if (error.response?.data) {
       errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(
         error.response.data,
@@ -68,11 +95,15 @@ export function processError(
         2
       )}`
     }
-    if (error.stack) {
-      errorMessage = `${errorMessage}\nStack:\n${error.stack}`
+  } else if (isOctokitTypesRequestError(error)) {
+    errorMessage = `HTTP response code ${error.status}. ${error.documentation_url}`
+    if (error.errors && error.errors.length > 0) {
+      for (const e of error.errors) {
+        errorMessage = `${errorMessage}\n${JSON.stringify(e, undefined, 2)}`
+      }
     }
-  } else if (error instanceof Error && error.stack) {
-    errorMessage = `Stack:\n${error.stack}`
+  } else if (isErrorWithStatus(error)) {
+    errorMessage = `HTTP response code ${error.status}.`
   }
   if (returnMessage !== '' && errorMessage !== '') {
     returnMessage = `${returnMessage}\n${errorMessage}`
@@ -88,6 +119,38 @@ export function processError(
 
 export class Helper {
   constructor(private octokit: Octokit) {}
+
+  async getFileContent(
+    owner: string,
+    repo: string,
+    path: string,
+    ref: string
+  ): Promise<string | undefined> {
+    return await this.octokit.rest.repos
+      .getContent({owner, repo, path, ref})
+      .then(
+        response => {
+          if ((response.data as {content?: string}).content !== undefined) {
+            info(`- Found: ${path}`)
+            return JSON.parse(
+              Buffer.from(
+                (response.data as {content: string}).content,
+                (response.data as {encoding: BufferEncoding}).encoding
+              ).toString()
+            ) as string
+          }
+          info(`- Not found (content missing): ${path}`)
+          return undefined
+        },
+        (reason: OctokitTypesRequestError) => {
+          if (reason.status === 404) {
+            info(`- Not found: ${path}`)
+            return undefined
+          }
+          throw new Error(processError(reason, false))
+        }
+      )
+  }
 
   async getPull(
     owner: string,
@@ -161,50 +224,25 @@ export class Helper {
       '.gitlab/CODEOWNERS',
       'docs/CODEOWNERS'
     ]
-    let contentObject: RepoContent | undefined
     const codeOwnerEntries: CodeOwnerEntry[] = []
+    let content: string | undefined
     for (const file of files) {
-      try {
-        const response = await this.octokit.rest.repos.getContent({
-          owner,
-          repo,
-          path: file,
-          ref
-        })
-        info(`- Found: ${file}`)
-        contentObject = response.data
-        break
-      } catch (error: unknown) {
-        if (error instanceof RequestError && error.status === 404) {
-          info(`- Not found: ${file}`)
-        } else {
-          throw new Error(
-            processError(error, false, 'Failed to get CODEOWNERS file')
-          )
+      content = await this.getFileContent(owner, repo, file, ref)
+      if (content) {
+        const lines = content.split(/\r\n|\r|\n/)
+        for (const line of lines) {
+          if (!line || line.startsWith('#')) {
+            continue
+          }
+          const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/)
+          const matcher = ignore().add(path)
+          const match = matcher.ignores.bind(matcher)
+          codeOwnerEntries.push({path, owners, match})
         }
+        return codeOwnerEntries.reverse()
       }
     }
-    if (contentObject && (contentObject as {content: string}).content) {
-      const content = JSON.parse(
-        Buffer.from(
-          (contentObject as {content: string}).content,
-          (contentObject as {encoding: BufferEncoding}).encoding
-        ).toString()
-      ) as string
-      const lines = content.split(/\r\n|\r|\n/)
-      for (const line of lines) {
-        if (!line || line.startsWith('#')) {
-          continue
-        }
-        const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/)
-        const matcher = ignore().add(path)
-        const match = matcher.ignores.bind(matcher)
-        codeOwnerEntries.push({path, owners, match})
-      }
-      return codeOwnerEntries.reverse()
-    } else {
-      return codeOwnerEntries
-    }
+    return codeOwnerEntries
   }
 
   async getCodeTeams(
@@ -219,48 +257,23 @@ export class Helper {
       '.gitlab/CODETEAMS',
       'docs/CODETEAMS'
     ]
-    let contentObject: RepoContent | undefined
     const codeTeamEntries: CodeTeamEntry[] = []
+    let content: string | undefined
     for (const file of files) {
-      try {
-        const response = await this.octokit.rest.repos.getContent({
-          owner,
-          repo,
-          path: file,
-          ref
-        })
-        info(`- Found: ${file}`)
-        contentObject = response.data
-        break
-      } catch (error: unknown) {
-        if (error instanceof RequestError && error.status === 404) {
-          info(`- Not found: ${file}`)
-        } else {
-          throw new Error(
-            processError(error, false, 'Failed to get CODETEAMS file')
-          )
+      content = await this.getFileContent(owner, repo, file, ref)
+      if (content) {
+        const lines = content.split(/\r\n|\r|\n/)
+        for (const line of lines) {
+          if (!line || line.startsWith('#')) {
+            continue
+          }
+          const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/)
+          codeTeamEntries.push({label, users})
         }
+        return codeTeamEntries.reverse()
       }
     }
-    if (contentObject && (contentObject as {content: string}).content) {
-      const content = JSON.parse(
-        Buffer.from(
-          (contentObject as {content: string}).content,
-          (contentObject as {encoding: BufferEncoding}).encoding
-        ).toString()
-      ) as string
-      const lines = content.split(/\r\n|\r|\n/)
-      for (const line of lines) {
-        if (!line || line.startsWith('#')) {
-          continue
-        }
-        const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/)
-        codeTeamEntries.push({label, users})
-      }
-      return codeTeamEntries.reverse()
-    } else {
-      return codeTeamEntries
-    }
+    return codeTeamEntries
   }
 
   async getPullCodeOwners(
