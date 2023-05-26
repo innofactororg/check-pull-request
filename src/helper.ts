@@ -296,7 +296,6 @@ export class Helper {
             if (owner.includes('/')) {
               notice(`Owner ${owner} is a team. Teams will be ignored.`)
             } else if (owner.startsWith('@')) {
-              info(`Owner ${owner} is a code owner of ${relativePath}.`)
               owners.push(owner)
             } else {
               notice(
