@@ -274,7 +274,7 @@ class Helper {
                 });
                 if (response.data.content !== undefined) {
                     (0, core_1.info)(`- Found: ${path}`);
-                    return JSON.parse(Buffer.from(response.data.content, response.data.encoding).toString());
+                    return Buffer.from(response.data.content, response.data.encoding).toString('utf-8');
                 }
                 (0, core_1.info)(`- Not found (content missing): ${path}`);
                 return undefined;

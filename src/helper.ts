@@ -143,12 +143,10 @@ export class Helper {
       })
       if ((response.data as {content?: string}).content !== undefined) {
         info(`- Found: ${path}`)
-        return JSON.parse(
-          Buffer.from(
-            (response.data as {content: string}).content,
-            (response.data as {encoding: BufferEncoding}).encoding
-          ).toString()
-        ) as string
+        return Buffer.from(
+          (response.data as {content: string}).content,
+          (response.data as {encoding: BufferEncoding}).encoding
+        ).toString('utf-8')
       }
       info(`- Not found (content missing): ${path}`)
       return undefined
