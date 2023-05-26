@@ -179,6 +179,22 @@ function isErrorWithMessage(error) {
         'message' in error &&
         typeof error.message === 'string');
 }
+function isErrorWithStatus(error) {
+    return (typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        typeof error.status === 'number');
+}
+function isOctokitTypesRequestError(error) {
+    return (typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        typeof error.name === 'string' &&
+        'status' in error &&
+        typeof error.status === 'number' &&
+        'documentation_url' in error &&
+        typeof error.documentation_url === 'string');
+}
 function getErrorString(error) {
     if (isErrorWithMessage(error))
         return error.message;
@@ -204,16 +220,21 @@ function processError(error, fail = false, message) {
     }
     errorMessage = '';
     if (error instanceof request_error_1.RequestError) {
-        errorMessage = `HTTP response code ${error.status} for ${error.request.method} request to ${error.request.url}.`;
+        errorMessage = `HTTP response code ${error.status} from ${error.request.method} ${error.request.url}.`;
         if ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) {
             errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(error.response.data, undefined, 2)}`;
         }
-        if (error.stack) {
-            errorMessage = `${errorMessage}\nStack:\n${error.stack}`;
+    }
+    else if (isOctokitTypesRequestError(error)) {
+        errorMessage = `HTTP response code ${error.status}. ${error.documentation_url}`;
+        if (error.errors && error.errors.length > 0) {
+            for (const e of error.errors) {
+                errorMessage = `${errorMessage}\n${JSON.stringify(e, undefined, 2)}`;
+            }
         }
     }
-    else if (error instanceof Error && error.stack) {
-        errorMessage = `Stack:\n${error.stack}`;
+    else if (isErrorWithStatus(error)) {
+        errorMessage = `HTTP response code ${error.status}.`;
     }
     if (returnMessage !== '' && errorMessage !== '') {
         returnMessage = `${returnMessage}\n${errorMessage}`;
@@ -231,6 +252,31 @@ exports.processError = processError;
 class Helper {
     constructor(octokit) {
         this.octokit = octokit;
+    }
+    getFileContent(owner, repo, path, ref) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const response = yield this.octokit.rest.repos.getContent({
+                    owner,
+                    repo,
+                    path,
+                    ref
+                });
+                if (response.data.content !== undefined) {
+                    (0, core_1.info)(`- Found: ${path}`);
+                    return JSON.parse(Buffer.from(response.data.content, response.data.encoding).toString());
+                }
+                (0, core_1.info)(`- Not found (content missing): ${path}`);
+                return undefined;
+            }
+            catch (error) {
+                if (isErrorWithStatus(error) && error.status === 404) {
+                    (0, core_1.info)(`- Not found: ${path}`);
+                    return undefined;
+                }
+                throw new Error(processError(error, false));
+            }
+        });
     }
     getPull(owner, repo, pullNumber) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -289,46 +335,25 @@ class Helper {
                 '.gitlab/CODEOWNERS',
                 'docs/CODEOWNERS'
             ];
-            let contentObject;
             const codeOwnerEntries = [];
+            let content;
             for (const file of files) {
-                try {
-                    const response = yield this.octokit.rest.repos.getContent({
-                        owner,
-                        repo,
-                        path: file,
-                        ref
-                    });
-                    (0, core_1.info)(`- Found: ${file}`);
-                    contentObject = response.data;
-                    break;
-                }
-                catch (error) {
-                    if (error instanceof request_error_1.RequestError && error.status === 404) {
-                        (0, core_1.info)(`- Not found: ${file}`);
+                content = yield this.getFileContent(owner, repo, file, ref);
+                if (content) {
+                    const lines = content.split(/\r\n|\r|\n/);
+                    for (const line of lines) {
+                        if (!line || line.startsWith('#')) {
+                            continue;
+                        }
+                        const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/);
+                        const matcher = (0, ignore_1.default)().add(path);
+                        const match = matcher.ignores.bind(matcher);
+                        codeOwnerEntries.push({ path, owners, match });
                     }
-                    else {
-                        throw new Error(processError(error, false, 'Failed to get CODEOWNERS file'));
-                    }
+                    return codeOwnerEntries.reverse();
                 }
             }
-            if (contentObject && contentObject.content) {
-                const content = JSON.parse(Buffer.from(contentObject.content, contentObject.encoding).toString());
-                const lines = content.split(/\r\n|\r|\n/);
-                for (const line of lines) {
-                    if (!line || line.startsWith('#')) {
-                        continue;
-                    }
-                    const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/);
-                    const matcher = (0, ignore_1.default)().add(path);
-                    const match = matcher.ignores.bind(matcher);
-                    codeOwnerEntries.push({ path, owners, match });
-                }
-                return codeOwnerEntries.reverse();
-            }
-            else {
-                return codeOwnerEntries;
-            }
+            return codeOwnerEntries;
         });
     }
     getCodeTeams(owner, repo, ref) {
@@ -340,44 +365,23 @@ class Helper {
                 '.gitlab/CODETEAMS',
                 'docs/CODETEAMS'
             ];
-            let contentObject;
             const codeTeamEntries = [];
+            let content;
             for (const file of files) {
-                try {
-                    const response = yield this.octokit.rest.repos.getContent({
-                        owner,
-                        repo,
-                        path: file,
-                        ref
-                    });
-                    (0, core_1.info)(`- Found: ${file}`);
-                    contentObject = response.data;
-                    break;
-                }
-                catch (error) {
-                    if (error instanceof request_error_1.RequestError && error.status === 404) {
-                        (0, core_1.info)(`- Not found: ${file}`);
+                content = yield this.getFileContent(owner, repo, file, ref);
+                if (content) {
+                    const lines = content.split(/\r\n|\r|\n/);
+                    for (const line of lines) {
+                        if (!line || line.startsWith('#')) {
+                            continue;
+                        }
+                        const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/);
+                        codeTeamEntries.push({ label, users });
                     }
-                    else {
-                        throw new Error(processError(error, false, 'Failed to get CODETEAMS file'));
-                    }
+                    return codeTeamEntries.reverse();
                 }
             }
-            if (contentObject && contentObject.content) {
-                const content = JSON.parse(Buffer.from(contentObject.content, contentObject.encoding).toString());
-                const lines = content.split(/\r\n|\r|\n/);
-                for (const line of lines) {
-                    if (!line || line.startsWith('#')) {
-                        continue;
-                    }
-                    const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/);
-                    codeTeamEntries.push({ label, users });
-                }
-                return codeTeamEntries.reverse();
-            }
-            else {
-                return codeTeamEntries;
-            }
+            return codeTeamEntries;
         });
     }
     getPullCodeOwners(files, codeOwnerEntries) {

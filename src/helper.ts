@@ -126,30 +126,31 @@ export class Helper {
     path: string,
     ref: string
   ): Promise<string | undefined> {
-    return await this.octokit.rest.repos
-      .getContent({owner, repo, path, ref})
-      .then(
-        response => {
-          if ((response.data as {content?: string}).content !== undefined) {
-            info(`- Found: ${path}`)
-            return JSON.parse(
-              Buffer.from(
-                (response.data as {content: string}).content,
-                (response.data as {encoding: BufferEncoding}).encoding
-              ).toString()
-            ) as string
-          }
-          info(`- Not found (content missing): ${path}`)
-          return undefined
-        },
-        (reason: OctokitTypesRequestError) => {
-          if (reason.status === 404) {
-            info(`- Not found: ${path}`)
-            return undefined
-          }
-          throw new Error(processError(reason, false))
-        }
-      )
+    try {
+      const response = await this.octokit.rest.repos.getContent({
+        owner,
+        repo,
+        path,
+        ref
+      })
+      if ((response.data as {content?: string}).content !== undefined) {
+        info(`- Found: ${path}`)
+        return JSON.parse(
+          Buffer.from(
+            (response.data as {content: string}).content,
+            (response.data as {encoding: BufferEncoding}).encoding
+          ).toString()
+        ) as string
+      }
+      info(`- Not found (content missing): ${path}`)
+      return undefined
+    } catch (error: unknown) {
+      if (isErrorWithStatus(error) && error.status === 404) {
+        info(`- Not found: ${path}`)
+        return undefined
+      }
+      throw new Error(processError(error, false))
+    }
   }
 
   async getPull(
