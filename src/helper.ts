@@ -218,7 +218,7 @@ export class Helper {
     repo: string,
     ref: string
   ): Promise<CodeOwnerEntry[]> {
-    info('Get CODEOWNERS file:')
+    info(`Look for CODEOWNERS file in ref ${ref} of repo ${repo}.`)
     const files: string[] = [
       'CODEOWNERS',
       '.github/CODEOWNERS',
@@ -251,7 +251,7 @@ export class Helper {
     repo: string,
     ref: string
   ): Promise<CodeTeamEntry[]> {
-    info('Get CODETEAMS file:')
+    info(`Look for CODETEAMS file in ref ${ref} of repo ${repo}.`)
     const files: string[] = [
       'CODETEAMS',
       '.github/CODETEAMS',

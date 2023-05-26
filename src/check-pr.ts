@@ -37,7 +37,7 @@ export const checkPullRequest = async ({
 
   const HelperApi = new Helper(octokit)
   const pr = await HelperApi.getPull(owner, repo, pullNumber)
-  if (pr?.base.sha && pr?.user?.login) {
+  if (pr?.base.ref && pr?.user?.login) {
     let codeOwnerEntries: CodeOwnerEntry[] = []
     let files: string[] = []
     const prUser = pr?.user?.login
@@ -49,7 +49,7 @@ export const checkPullRequest = async ({
       codeOwnerEntries = await HelperApi.getCodeOwners(
         owner,
         repo,
-        pr?.base.sha
+        pr.base.ref //pr?.base.sha
       )
       if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
         throw new Error(
@@ -99,7 +99,7 @@ export const checkPullRequest = async ({
       const codeTeamEntries = await HelperApi.getCodeTeams(
         owner,
         repo,
-        pr?.base.sha
+        pr.base.ref //pr?.base.sha
       )
       if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
         throw new Error(

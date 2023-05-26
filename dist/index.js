@@ -31,14 +31,15 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
     });
     const HelperApi = new helper_1.Helper(octokit);
     const pr = yield HelperApi.getPull(owner, repo, pullNumber);
-    if ((pr === null || pr === void 0 ? void 0 : pr.base.sha) && ((_a = pr === null || pr === void 0 ? void 0 : pr.user) === null || _a === void 0 ? void 0 : _a.login)) {
+    if ((pr === null || pr === void 0 ? void 0 : pr.base.ref) && ((_a = pr === null || pr === void 0 ? void 0 : pr.user) === null || _a === void 0 ? void 0 : _a.login)) {
         let codeOwnerEntries = [];
         let files = [];
         const prUser = (_b = pr === null || pr === void 0 ? void 0 : pr.user) === null || _b === void 0 ? void 0 : _b.login;
         if (requireCodeOwnersFile ||
             requireActorIsCodeOwner ||
             requireCodeOwnerReview) {
-            codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr === null || pr === void 0 ? void 0 : pr.base.sha);
+            codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr.base.ref //pr?.base.sha
+            );
             if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
                 throw new Error(`Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch. About code owners: https://t.ly/8KUb`);
             }
@@ -66,7 +67,8 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
             }
         }
         if (requireCodeTeamsFile || requireCodeTeamReview) {
-            const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr === null || pr === void 0 ? void 0 : pr.base.sha);
+            const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr.base.ref //pr?.base.sha
+            );
             if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
                 throw new Error(`Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch.`);
             }
@@ -328,7 +330,7 @@ class Helper {
     }
     getCodeOwners(owner, repo, ref) {
         return __awaiter(this, void 0, void 0, function* () {
-            (0, core_1.info)('Get CODEOWNERS file:');
+            (0, core_1.info)(`Look for CODEOWNERS file in ref ${ref} of repo ${repo}.`);
             const files = [
                 'CODEOWNERS',
                 '.github/CODEOWNERS',
@@ -358,7 +360,7 @@ class Helper {
     }
     getCodeTeams(owner, repo, ref) {
         return __awaiter(this, void 0, void 0, function* () {
-            (0, core_1.info)('Get CODETEAMS file:');
+            (0, core_1.info)(`Look for CODETEAMS file in ref ${ref} of repo ${repo}.`);
             const files = [
                 'CODETEAMS',
                 '.github/CODETEAMS',
