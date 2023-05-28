@@ -87,7 +87,9 @@ export const checkPullRequest = async ({
       )
       if (!hasReview) {
         throw new Error(
-          `Pull request ${pullNumber} has not been approved by a code owner.`
+          `Pull request ${pullNumber} has not been approved by a code owner (${owners.join(
+            ','
+          )}).`
         )
       }
     }
