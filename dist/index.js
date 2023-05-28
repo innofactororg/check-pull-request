@@ -358,7 +358,9 @@ class Helper {
                         const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/);
                         const matcher = (0, ignore_1.default)().add(path);
                         const match = matcher.ignores.bind(matcher);
-                        codeOwnerEntries.push({ path, owners, match });
+                        if (codeOwnerEntries.findIndex(p => p.path === path) === -1) {
+                            codeOwnerEntries.push({ path, owners, match });
+                        }
                     }
                     return codeOwnerEntries.reverse();
                 }
@@ -386,7 +388,9 @@ class Helper {
                             continue;
                         }
                         const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/);
-                        codeTeamEntries.push({ label, users });
+                        if (codeTeamEntries.findIndex(l => l.label === label) === -1) {
+                            codeTeamEntries.push({ label, users });
+                        }
                     }
                     return codeTeamEntries.reverse();
                 }
@@ -406,7 +410,9 @@ class Helper {
                                 (0, core_1.notice)(`Owner ${owner} is a team. Teams will be ignored.`);
                             }
                             else if (owner.startsWith('@')) {
-                                owners.push(owner);
+                                if (owners.findIndex(o => o === owner) === -1) {
+                                    owners.push(owner);
+                                }
                             }
                             else {
                                 (0, core_1.notice)(`Owner ${owner} don't start with @. This owner will be ignored.`);

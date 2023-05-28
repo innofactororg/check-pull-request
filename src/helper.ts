@@ -244,7 +244,9 @@ export class Helper {
           const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/)
           const matcher = ignore().add(path)
           const match = matcher.ignores.bind(matcher)
-          codeOwnerEntries.push({path, owners, match})
+          if (codeOwnerEntries.findIndex(p => p.path === path) === -1) {
+            codeOwnerEntries.push({path, owners, match})
+          }
         }
         return codeOwnerEntries.reverse()
       }
@@ -275,7 +277,9 @@ export class Helper {
             continue
           }
           const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/)
-          codeTeamEntries.push({label, users})
+          if (codeTeamEntries.findIndex(l => l.label === label) === -1) {
+            codeTeamEntries.push({label, users})
+          }
         }
         return codeTeamEntries.reverse()
       }
@@ -296,7 +300,9 @@ export class Helper {
             if (owner.includes('/')) {
               notice(`Owner ${owner} is a team. Teams will be ignored.`)
             } else if (owner.startsWith('@')) {
-              owners.push(owner)
+              if (owners.findIndex(o => o === owner) === -1) {
+                owners.push(owner)
+              }
             } else {
               notice(
                 `Owner ${owner} don't start with @. This owner will be ignored.`
