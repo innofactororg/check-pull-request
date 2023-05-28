@@ -62,7 +62,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
             const owners = yield HelperApi.getPullCodeOwners(files, codeOwnerEntries);
             const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, owners, prUser);
             if (!hasReview) {
-                throw new Error(`Pull request ${pullNumber} has not been approved by a code owner.`);
+                throw new Error(`Pull request ${pullNumber} has not been approved by a code owner (${owners.join(',')}).`);
             }
         }
         if (requireCodeTeamsFile || requireCodeTeamReview) {
@@ -406,7 +406,6 @@ class Helper {
                                 (0, core_1.notice)(`Owner ${owner} is a team. Teams will be ignored.`);
                             }
                             else if (owner.startsWith('@')) {
-                                (0, core_1.info)(`Owner ${owner} is a code owner of ${relativePath}.`);
                                 owners.push(owner);
                             }
                             else {
