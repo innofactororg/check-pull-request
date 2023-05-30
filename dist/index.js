@@ -83,6 +83,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                     if (labels.findIndex(e => e.name === entry.label) === -1) {
                         throw new Error(`Found required label ${entry.label} in the CODETEAMS file. Please add the label to pull request ${pullNumber} and request a review.`);
                     }
+                    (0, core_1.info)(`Found label ${entry.label} in pull request ${pullNumber}.`);
                     pullUser = 'skipPrUserTest';
                     if (entry.users.length !== 1) {
                         pullUser = prUser;
