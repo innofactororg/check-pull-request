@@ -38,12 +38,19 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
         if (requireCodeOwnersFile ||
             requireActorIsCodeOwner ||
             requireCodeOwnerReview) {
+            if (requireCodeOwnersFile) {
+                (0, core_1.info)('Check require_codeowners_file');
+            }
             codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr.base.ref);
             if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
                 throw new Error(`Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch. About code owners: https://t.ly/8KUb`);
             }
+            else if (requireCodeOwnersFile) {
+                (0, core_1.info)('Passed require_codeowners_file');
+            }
             files = yield HelperApi.getPullFiles(owner, repo, pullNumber);
             if (requireActorIsCodeOwner) {
+                (0, core_1.info)('Check require_code_owner');
                 if (codeOwnerEntries.length === 0) {
                     (0, core_1.notice)(`Found no CODEOWNERS file in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`);
                 }
@@ -56,24 +63,34 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                 else {
                     (0, core_1.notice)(`Could not find any changed files in pull request ${pullNumber}. This is unexpected.`);
                 }
+                (0, core_1.info)('Passed require_code_owner');
             }
         }
         if (requireCodeOwnerReview) {
+            (0, core_1.info)('Check require_code_owner_review');
             const owners = yield HelperApi.getPullCodeOwners(files, codeOwnerEntries);
             const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, owners, prUser);
             if (!hasReview) {
                 throw new Error(`Pull request ${pullNumber} has not been approved by a code owner (${owners.join(',')}).`);
             }
+            (0, core_1.info)('Passed require_code_owner_review');
         }
         if (requireCodeTeamsFile || requireCodeTeamReview) {
+            if (requireCodeTeamsFile) {
+                (0, core_1.info)('Check require_codeteams_file');
+            }
             const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr.base.ref);
             if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
                 throw new Error(`Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch.`);
             }
+            else if (requireCodeTeamsFile) {
+                (0, core_1.info)('Passed require_codeteams_file');
+            }
             if (codeTeamEntries.length === 0) {
                 (0, core_1.notice)(`A CODETEAMS file is missing in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`);
             }
-            else {
+            else if (requireCodeTeamReview) {
+                (0, core_1.info)('Check require_code_team_review');
                 const labels = yield HelperApi.getLabelsOnIssue(owner, repo, pullNumber);
                 if (!labels) {
                     throw new Error(`Pull request ${pullNumber} has no labels, but a code team review is required. Please add label according to the CODETEAMS file.`);
@@ -93,9 +110,11 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                         throw new Error(`Pull request ${pullNumber} has not been approved by a ${entry.label} code team user (${entry.users.join(',')}).`);
                     }
                 }
+                (0, core_1.info)('Passed require_code_team_review');
             }
         }
         if (requiredMergeableState && requiredMergeableState.length > 0) {
+            (0, core_1.info)('Check required_mergeable_state');
             if (pr.merged) {
                 (0, core_1.info)(`Pull request ${pullNumber} is merged.`);
             }
@@ -141,11 +160,13 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
             else {
                 throw new Error(`Pull request ${pullNumber} is not mergable.`);
             }
+            (0, core_1.info)('Passed required_mergeable_state');
         }
     }
     else {
         throw new Error(`Unable to get pull request ${pullNumber}.`);
     }
+    (0, core_1.info)('All checks completed.');
 });
 exports.checkPullRequest = checkPullRequest;
 
