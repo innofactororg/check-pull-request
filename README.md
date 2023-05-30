@@ -139,9 +139,9 @@ apps/ @octocat
 # This is a comment.
 # Each line start with a GitHub label followed by one or more users.
 
-# In this example, a pull request labeled `important` will require
-# approval review from @octocat.
-important @octocat
+# In this example, a pull request labeled `require-team-review/security`
+# will require approval review from @octocat.
+require-team-review/security @octocat
 
 # In this example, a pull request labeled `need security review`
 # will require approval review from @doctocat or @octocat.

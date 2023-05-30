@@ -122,6 +122,7 @@ export const checkPullRequest = async ({
               `Found required label ${entry.label} in the CODETEAMS file. Please add the label to pull request ${pullNumber} and request a review.`
             )
           }
+          info(`Found label ${entry.label} in pull request ${pullNumber}.`)
           pullUser = 'skipPrUserTest'
           if (entry.users.length !== 1) {
             pullUser = prUser
