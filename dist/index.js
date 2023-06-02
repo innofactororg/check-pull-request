@@ -31,19 +31,26 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
     });
     const HelperApi = new helper_1.Helper(octokit);
     const pr = yield HelperApi.getPull(owner, repo, pullNumber);
-    if ((pr === null || pr === void 0 ? void 0 : pr.base.sha) && ((_a = pr === null || pr === void 0 ? void 0 : pr.user) === null || _a === void 0 ? void 0 : _a.login)) {
+    if ((pr === null || pr === void 0 ? void 0 : pr.base.ref) && ((_a = pr === null || pr === void 0 ? void 0 : pr.user) === null || _a === void 0 ? void 0 : _a.login)) {
         let codeOwnerEntries = [];
         let files = [];
         const prUser = (_b = pr === null || pr === void 0 ? void 0 : pr.user) === null || _b === void 0 ? void 0 : _b.login;
         if (requireCodeOwnersFile ||
             requireActorIsCodeOwner ||
             requireCodeOwnerReview) {
-            codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr === null || pr === void 0 ? void 0 : pr.base.sha);
+            if (requireCodeOwnersFile) {
+                (0, core_1.info)('Check require_codeowners_file');
+            }
+            codeOwnerEntries = yield HelperApi.getCodeOwners(owner, repo, pr.base.ref);
             if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
                 throw new Error(`Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch. About code owners: https://t.ly/8KUb`);
             }
+            else if (requireCodeOwnersFile) {
+                (0, core_1.info)('Passed require_codeowners_file');
+            }
             files = yield HelperApi.getPullFiles(owner, repo, pullNumber);
             if (requireActorIsCodeOwner) {
+                (0, core_1.info)('Check require_code_owner');
                 if (codeOwnerEntries.length === 0) {
                     (0, core_1.notice)(`Found no CODEOWNERS file in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`);
                 }
@@ -56,24 +63,34 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                 else {
                     (0, core_1.notice)(`Could not find any changed files in pull request ${pullNumber}. This is unexpected.`);
                 }
+                (0, core_1.info)('Passed require_code_owner');
             }
         }
         if (requireCodeOwnerReview) {
+            (0, core_1.info)('Check require_code_owner_review');
             const owners = yield HelperApi.getPullCodeOwners(files, codeOwnerEntries);
             const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, owners, prUser);
             if (!hasReview) {
-                throw new Error(`Pull request ${pullNumber} has not been approved by a code owner.`);
+                throw new Error(`Pull request ${pullNumber} has not been approved by a code owner (${owners.join(',')}).`);
             }
+            (0, core_1.info)('Passed require_code_owner_review');
         }
         if (requireCodeTeamsFile || requireCodeTeamReview) {
-            const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr === null || pr === void 0 ? void 0 : pr.base.sha);
+            if (requireCodeTeamsFile) {
+                (0, core_1.info)('Check require_codeteams_file');
+            }
+            const codeTeamEntries = yield HelperApi.getCodeTeams(owner, repo, pr.base.ref);
             if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
                 throw new Error(`Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch.`);
+            }
+            else if (requireCodeTeamsFile) {
+                (0, core_1.info)('Passed require_codeteams_file');
             }
             if (codeTeamEntries.length === 0) {
                 (0, core_1.notice)(`A CODETEAMS file is missing in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`);
             }
-            else {
+            else if (requireCodeTeamReview) {
+                (0, core_1.info)('Check require_code_team_review');
                 const labels = yield HelperApi.getLabelsOnIssue(owner, repo, pullNumber);
                 if (!labels) {
                     throw new Error(`Pull request ${pullNumber} has no labels, but a code team review is required. Please add label according to the CODETEAMS file.`);
@@ -83,6 +100,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                     if (labels.findIndex(e => e.name === entry.label) === -1) {
                         throw new Error(`Found required label ${entry.label} in the CODETEAMS file. Please add the label to pull request ${pullNumber} and request a review.`);
                     }
+                    (0, core_1.info)(`Found label ${entry.label} in pull request ${pullNumber}.`);
                     pullUser = 'skipPrUserTest';
                     if (entry.users.length !== 1) {
                         pullUser = prUser;
@@ -92,9 +110,11 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                         throw new Error(`Pull request ${pullNumber} has not been approved by a ${entry.label} code team user (${entry.users.join(',')}).`);
                     }
                 }
+                (0, core_1.info)('Passed require_code_team_review');
             }
         }
         if (requiredMergeableState && requiredMergeableState.length > 0) {
+            (0, core_1.info)('Check required_mergeable_state');
             if (pr.merged) {
                 (0, core_1.info)(`Pull request ${pullNumber} is merged.`);
             }
@@ -140,11 +160,13 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
             else {
                 throw new Error(`Pull request ${pullNumber} is not mergable.`);
             }
+            (0, core_1.info)('Passed required_mergeable_state');
         }
     }
     else {
         throw new Error(`Unable to get pull request ${pullNumber}.`);
     }
+    (0, core_1.info)('All checks completed.');
 });
 exports.checkPullRequest = checkPullRequest;
 
@@ -179,6 +201,22 @@ function isErrorWithMessage(error) {
         'message' in error &&
         typeof error.message === 'string');
 }
+function isErrorWithStatus(error) {
+    return (typeof error === 'object' &&
+        error !== null &&
+        'status' in error &&
+        typeof error.status === 'number');
+}
+function isOctokitTypesRequestError(error) {
+    return (typeof error === 'object' &&
+        error !== null &&
+        'name' in error &&
+        typeof error.name === 'string' &&
+        'status' in error &&
+        typeof error.status === 'number' &&
+        'documentation_url' in error &&
+        typeof error.documentation_url === 'string');
+}
 function getErrorString(error) {
     if (isErrorWithMessage(error))
         return error.message;
@@ -204,16 +242,31 @@ function processError(error, fail = false, message) {
     }
     errorMessage = '';
     if (error instanceof request_error_1.RequestError) {
-        errorMessage = `HTTP response code ${error.status} for ${error.request.method} request to ${error.request.url}.`;
+        errorMessage = `HTTP response code ${error.status} from ${error.request.method} ${error.request.url}.`;
         if ((_a = error.response) === null || _a === void 0 ? void 0 : _a.data) {
-            errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(error.response.data, undefined, 2)}`;
-        }
-        if (error.stack) {
-            errorMessage = `${errorMessage}\nStack:\n${error.stack}`;
+            try {
+                errorMessage = `${errorMessage}\nResponse body:\n${JSON.stringify(error.response.data, undefined, 2)}`;
+            }
+            catch (_b) {
+                errorMessage = `${errorMessage}\nResponse body:\n${error.response.data}`;
+            }
         }
     }
-    else if (error instanceof Error && error.stack) {
-        errorMessage = `Stack:\n${error.stack}`;
+    else if (isOctokitTypesRequestError(error)) {
+        errorMessage = `HTTP response code ${error.status}. ${error.documentation_url}`;
+        if (error.errors && error.errors.length > 0) {
+            for (const e of error.errors) {
+                if (e.message) {
+                    errorMessage = `${errorMessage}\n${e.message} (${e.code} ${e.field} ${e.resource})`;
+                }
+                else {
+                    errorMessage = `${errorMessage}\n${e.code} ${e.field} ${e.resource}`;
+                }
+            }
+        }
+    }
+    else if (isErrorWithStatus(error)) {
+        errorMessage = `HTTP response code ${error.status}.`;
     }
     if (returnMessage !== '' && errorMessage !== '') {
         returnMessage = `${returnMessage}\n${errorMessage}`;
@@ -231,6 +284,31 @@ exports.processError = processError;
 class Helper {
     constructor(octokit) {
         this.octokit = octokit;
+    }
+    getFileContent(owner, repo, path, ref) {
+        return __awaiter(this, void 0, void 0, function* () {
+            try {
+                const response = yield this.octokit.rest.repos.getContent({
+                    owner,
+                    repo,
+                    path,
+                    ref
+                });
+                if (response.data.content !== undefined) {
+                    (0, core_1.info)(`- Found: ${path}`);
+                    return Buffer.from(response.data.content, response.data.encoding).toString('utf-8');
+                }
+                (0, core_1.info)(`- Not found (content missing): ${path}`);
+                return undefined;
+            }
+            catch (error) {
+                if (isErrorWithStatus(error) && error.status === 404) {
+                    (0, core_1.info)(`- Not found: ${path}`);
+                    return undefined;
+                }
+                throw new Error(processError(error, false));
+            }
+        });
     }
     getPull(owner, repo, pullNumber) {
         return __awaiter(this, void 0, void 0, function* () {
@@ -282,102 +360,64 @@ class Helper {
     }
     getCodeOwners(owner, repo, ref) {
         return __awaiter(this, void 0, void 0, function* () {
-            (0, core_1.info)('Get CODEOWNERS file:');
+            (0, core_1.info)(`Look for CODEOWNERS file in ${ref} branch.`);
             const files = [
                 'CODEOWNERS',
                 '.github/CODEOWNERS',
                 '.gitlab/CODEOWNERS',
                 'docs/CODEOWNERS'
             ];
-            let contentObject;
             const codeOwnerEntries = [];
+            let content;
             for (const file of files) {
-                try {
-                    const response = yield this.octokit.rest.repos.getContent({
-                        owner,
-                        repo,
-                        path: file,
-                        ref
-                    });
-                    (0, core_1.info)(`- Found: ${file}`);
-                    contentObject = response.data;
-                    break;
-                }
-                catch (error) {
-                    if (error instanceof request_error_1.RequestError && error.status === 404) {
-                        (0, core_1.info)(`- Not found: ${file}`);
+                content = yield this.getFileContent(owner, repo, file, ref);
+                if (content) {
+                    const lines = content.split(/\r\n|\r|\n/);
+                    for (const line of lines) {
+                        if (!line || line.startsWith('#')) {
+                            continue;
+                        }
+                        const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/);
+                        const matcher = (0, ignore_1.default)().add(path);
+                        const match = matcher.ignores.bind(matcher);
+                        if (codeOwnerEntries.findIndex(p => p.path === path) === -1) {
+                            codeOwnerEntries.push({ path, owners, match });
+                        }
                     }
-                    else {
-                        throw new Error(processError(error, false, 'Failed to get CODEOWNERS file'));
-                    }
+                    return codeOwnerEntries.reverse();
                 }
             }
-            if (contentObject && contentObject.content) {
-                const content = JSON.parse(Buffer.from(contentObject.content, contentObject.encoding).toString());
-                const lines = content.split(/\r\n|\r|\n/);
-                for (const line of lines) {
-                    if (!line || line.startsWith('#')) {
-                        continue;
-                    }
-                    const [path, ...owners] = line.replace(/#.*/g, '').trim().split(/\s+/);
-                    const matcher = (0, ignore_1.default)().add(path);
-                    const match = matcher.ignores.bind(matcher);
-                    codeOwnerEntries.push({ path, owners, match });
-                }
-                return codeOwnerEntries.reverse();
-            }
-            else {
-                return codeOwnerEntries;
-            }
+            return codeOwnerEntries;
         });
     }
     getCodeTeams(owner, repo, ref) {
         return __awaiter(this, void 0, void 0, function* () {
-            (0, core_1.info)('Get CODETEAMS file:');
+            (0, core_1.info)(`Look for CODETEAMS file in ${ref} branch.`);
             const files = [
                 'CODETEAMS',
                 '.github/CODETEAMS',
                 '.gitlab/CODETEAMS',
                 'docs/CODETEAMS'
             ];
-            let contentObject;
             const codeTeamEntries = [];
+            let content;
             for (const file of files) {
-                try {
-                    const response = yield this.octokit.rest.repos.getContent({
-                        owner,
-                        repo,
-                        path: file,
-                        ref
-                    });
-                    (0, core_1.info)(`- Found: ${file}`);
-                    contentObject = response.data;
-                    break;
-                }
-                catch (error) {
-                    if (error instanceof request_error_1.RequestError && error.status === 404) {
-                        (0, core_1.info)(`- Not found: ${file}`);
+                content = yield this.getFileContent(owner, repo, file, ref);
+                if (content) {
+                    const lines = content.split(/\r\n|\r|\n/);
+                    for (const line of lines) {
+                        if (!line || line.startsWith('#')) {
+                            continue;
+                        }
+                        const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/);
+                        if (codeTeamEntries.findIndex(l => l.label === label) === -1) {
+                            codeTeamEntries.push({ label, users });
+                        }
                     }
-                    else {
-                        throw new Error(processError(error, false, 'Failed to get CODETEAMS file'));
-                    }
+                    return codeTeamEntries.reverse();
                 }
             }
-            if (contentObject && contentObject.content) {
-                const content = JSON.parse(Buffer.from(contentObject.content, contentObject.encoding).toString());
-                const lines = content.split(/\r\n|\r|\n/);
-                for (const line of lines) {
-                    if (!line || line.startsWith('#')) {
-                        continue;
-                    }
-                    const [label, ...users] = line.replace(/#.*/g, '').trim().split(/\s+/);
-                    codeTeamEntries.push({ label, users });
-                }
-                return codeTeamEntries.reverse();
-            }
-            else {
-                return codeTeamEntries;
-            }
+            return codeTeamEntries;
         });
     }
     getPullCodeOwners(files, codeOwnerEntries) {
@@ -389,11 +429,12 @@ class Helper {
                     if (entry.match(relativePath)) {
                         for (const owner of entry.owners) {
                             if (owner.includes('/')) {
-                                (0, core_1.notice)(`Owner ${owner} is a team. This owner will be ignored.`);
+                                (0, core_1.notice)(`Owner ${owner} is a team. Teams will be ignored.`);
                             }
                             else if (owner.startsWith('@')) {
-                                (0, core_1.info)(`Owner ${owner} is a code owner of ${relativePath}.`);
-                                owners.push(owner);
+                                if (owners.findIndex(o => o === owner) === -1) {
+                                    owners.push(owner);
+                                }
                             }
                             else {
                                 (0, core_1.notice)(`Owner ${owner} don't start with @. This owner will be ignored.`);
@@ -451,9 +492,14 @@ class Helper {
                         (owners.length === 0 ||
                             (owners.length === 1 && owners.includes(`@${reviewer}`)) ||
                             (owners.includes(`@${reviewer}`) && prUser !== reviewer))) {
+                        (0, core_1.info)(`Pull request ${pullNumber} was approved by ${reviewer}.`);
                         return true;
                     }
                 }
+                (0, core_1.info)(`Pull request ${pullNumber} has not been approved.`);
+            }
+            else {
+                (0, core_1.notice)(`Pull request ${pullNumber} has no reviews.`);
             }
             return false;
         });

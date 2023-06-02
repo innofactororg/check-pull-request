@@ -37,7 +37,7 @@ export const checkPullRequest = async ({
 
   const HelperApi = new Helper(octokit)
   const pr = await HelperApi.getPull(owner, repo, pullNumber)
-  if (pr?.base.sha && pr?.user?.login) {
+  if (pr?.base.ref && pr?.user?.login) {
     let codeOwnerEntries: CodeOwnerEntry[] = []
     let files: string[] = []
     const prUser = pr?.user?.login
@@ -46,18 +46,20 @@ export const checkPullRequest = async ({
       requireActorIsCodeOwner ||
       requireCodeOwnerReview
     ) {
-      codeOwnerEntries = await HelperApi.getCodeOwners(
-        owner,
-        repo,
-        pr?.base.sha
-      )
+      if (requireCodeOwnersFile) {
+        info('Check require_codeowners_file')
+      }
+      codeOwnerEntries = await HelperApi.getCodeOwners(owner, repo, pr.base.ref)
       if (requireCodeOwnersFile && codeOwnerEntries.length === 0) {
         throw new Error(
           `Failed to get CODEOWNERS. This repository requires that a CODEOWNERS file exist in the ${pr?.base.ref} branch. About code owners: https://t.ly/8KUb`
         )
+      } else if (requireCodeOwnersFile) {
+        info('Passed require_codeowners_file')
       }
       files = await HelperApi.getPullFiles(owner, repo, pullNumber)
       if (requireActorIsCodeOwner) {
+        info('Check require_code_owner')
         if (codeOwnerEntries.length === 0) {
           notice(
             `Found no CODEOWNERS file in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`
@@ -78,9 +80,11 @@ export const checkPullRequest = async ({
             `Could not find any changed files in pull request ${pullNumber}. This is unexpected.`
           )
         }
+        info('Passed require_code_owner')
       }
     }
     if (requireCodeOwnerReview) {
+      info('Check require_code_owner_review')
       const owners = await HelperApi.getPullCodeOwners(files, codeOwnerEntries)
       const hasReview = await HelperApi.isReviewed(
         owner,
@@ -91,26 +95,35 @@ export const checkPullRequest = async ({
       )
       if (!hasReview) {
         throw new Error(
-          `Pull request ${pullNumber} has not been approved by a code owner.`
+          `Pull request ${pullNumber} has not been approved by a code owner (${owners.join(
+            ','
+          )}).`
         )
       }
+      info('Passed require_code_owner_review')
     }
     if (requireCodeTeamsFile || requireCodeTeamReview) {
+      if (requireCodeTeamsFile) {
+        info('Check require_codeteams_file')
+      }
       const codeTeamEntries = await HelperApi.getCodeTeams(
         owner,
         repo,
-        pr?.base.sha
+        pr.base.ref
       )
       if (requireCodeTeamsFile && codeTeamEntries.length === 0) {
         throw new Error(
           `Failed to get CODETEAMS. This repository requires that a CODETEAMS file exist in the ${pr?.base.ref} branch.`
         )
+      } else if (requireCodeTeamsFile) {
+        info('Passed require_codeteams_file')
       }
       if (codeTeamEntries.length === 0) {
         notice(
           `A CODETEAMS file is missing in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`
         )
-      } else {
+      } else if (requireCodeTeamReview) {
+        info('Check require_code_team_review')
         const labels = await HelperApi.getLabelsOnIssue(owner, repo, pullNumber)
         if (!labels) {
           throw new Error(
@@ -124,6 +137,7 @@ export const checkPullRequest = async ({
               `Found required label ${entry.label} in the CODETEAMS file. Please add the label to pull request ${pullNumber} and request a review.`
             )
           }
+          info(`Found label ${entry.label} in pull request ${pullNumber}.`)
           pullUser = 'skipPrUserTest'
           if (entry.users.length !== 1) {
             pullUser = prUser
@@ -143,9 +157,11 @@ export const checkPullRequest = async ({
             )
           }
         }
+        info('Passed require_code_team_review')
       }
     }
     if (requiredMergeableState && requiredMergeableState.length > 0) {
+      info('Check required_mergeable_state')
       if (pr.merged) {
         info(`Pull request ${pullNumber} is merged.`)
       } else if (pr.mergeable === null) {
@@ -189,8 +205,10 @@ export const checkPullRequest = async ({
       } else {
         throw new Error(`Pull request ${pullNumber} is not mergable.`)
       }
+      info('Passed required_mergeable_state')
     }
   } else {
     throw new Error(`Unable to get pull request ${pullNumber}.`)
   }
+  info('All checks completed.')
 }
