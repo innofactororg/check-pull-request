@@ -62,7 +62,7 @@ export const checkPullRequest = async ({
         info('Check require_code_owner')
         if (codeOwnerEntries.length === 0) {
           notice(
-            `Found no CODEOWNERS file in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`
+            `Found no CODEOWNERS file in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, the input parameters 'require_code_owner' and 'require_code_owner_review' has no effect.`
           )
         } else if (files) {
           const isOwner = await HelperApi.isActorOwner(
@@ -83,7 +83,7 @@ export const checkPullRequest = async ({
         info('Passed require_code_owner')
       }
     }
-    if (requireCodeOwnerReview) {
+    if (requireCodeOwnerReview && codeOwnerEntries.length !== 0) {
       info('Check require_code_owner_review')
       const owners = await HelperApi.getPullCodeOwners(files, codeOwnerEntries)
       const hasReview = await HelperApi.isReviewed(
@@ -120,7 +120,7 @@ export const checkPullRequest = async ({
       }
       if (codeTeamEntries.length === 0) {
         notice(
-          `A CODETEAMS file is missing in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`
+          `Found no CODETEAMS file in the ${pr?.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`
         )
       } else if (requireCodeTeamReview) {
         info('Check require_code_team_review')
