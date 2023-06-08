@@ -22,6 +22,10 @@ inputs:
     description: "Check that a code team user has reviewed and approved the pull request."
     required: false
     default: true
+  require_approved_review:
+    description: "Check that at least one approved review exist for the pull request."
+    required: false
+    default: true
   required_mergeable_state:
     description: "Check that the pull request mergable state is in one of the specified states."
     required: false
