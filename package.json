@@ -1,6 +1,6 @@
 {
   "name": "github-action-check-pull",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "description": "Check a pull request before another action is allowed, like for example auto merge.",
   "main": "lib/main.js",
   "scripts": {
