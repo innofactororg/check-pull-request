@@ -52,7 +52,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
             if (requireActorIsCodeOwner) {
                 (0, core_1.info)('Check require_code_owner');
                 if (codeOwnerEntries.length === 0) {
-                    (0, core_1.notice)(`Found no CODEOWNERS file in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, everyone is considered a code owner.`);
+                    (0, core_1.notice)(`Found no CODEOWNERS file in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODEOWNERS file, the input parameters 'require_code_owner' and 'require_code_owner_review' has no effect.`);
                 }
                 else if (files) {
                     const isOwner = yield HelperApi.isActorOwner(actor, files, codeOwnerEntries);
@@ -66,7 +66,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                 (0, core_1.info)('Passed require_code_owner');
             }
         }
-        if (requireCodeOwnerReview) {
+        if (requireCodeOwnerReview && codeOwnerEntries.length !== 0) {
             (0, core_1.info)('Check require_code_owner_review');
             const owners = yield HelperApi.getPullCodeOwners(files, codeOwnerEntries);
             const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, owners, prUser);
@@ -87,7 +87,7 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                 (0, core_1.info)('Passed require_codeteams_file');
             }
             if (codeTeamEntries.length === 0) {
-                (0, core_1.notice)(`A CODETEAMS file is missing in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`);
+                (0, core_1.notice)(`Found no CODETEAMS file in the ${pr === null || pr === void 0 ? void 0 : pr.base.ref} branch of the ${repo} repository. Without a CODETEAMS file, the input parameter 'require_code_team_review' has no effect.`);
             }
             else if (requireCodeTeamReview) {
                 (0, core_1.info)('Check require_code_team_review');
