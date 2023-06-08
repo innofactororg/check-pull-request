@@ -43,8 +43,7 @@ jobs:
         require_code_owner: true
 
         # Check that a code owner has reviewed and approved the pull request.
-        # The code owner can't be the user who opened the pull request, unless
-        # the user is the only owner.
+        # The code owner can't be the user who opened the pull request.
         #
         # Note: This action will ignore emails and teams specified in CODEOWNERS file.
         #
@@ -71,6 +70,12 @@ jobs:
         #
         # Default: true
         require_code_team_review: true
+
+        # Check that at least one approved review exist for the pull request.
+        # The reviewer can't be the user who opened the pull request.
+        #
+        # Default: true
+        require_approved_review: true
 
         # Check that the pull request mergable state is in one of the specified states.
         #

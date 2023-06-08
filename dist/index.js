@@ -21,7 +21,7 @@ const core_1 = __nccwpck_require__(2186);
 const github_1 = __nccwpck_require__(5438);
 const rest_1 = __nccwpck_require__(5375);
 const helper_1 = __nccwpck_require__(3947);
-const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCodeOwner, requireCodeOwnerReview, requireCodeTeamsFile, requireCodeTeamReview, requiredMergeableState, token }) => __awaiter(void 0, void 0, void 0, function* () {
+const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCodeOwner, requireCodeOwnerReview, requireCodeTeamsFile, requireCodeTeamReview, requireApprovedReview, requiredMergeableState, token }) => __awaiter(void 0, void 0, void 0, function* () {
     var _a, _b;
     const { owner, repo } = github_1.context.repo;
     const { actor } = github_1.context;
@@ -74,6 +74,14 @@ const checkPullRequest = ({ pullNumber, requireCodeOwnersFile, requireActorIsCod
                 throw new Error(`Pull request ${pullNumber} has not been approved by a code owner (${owners.join(',')}).`);
             }
             (0, core_1.info)('Passed require_code_owner_review');
+        }
+        else if (requireApprovedReview) {
+            (0, core_1.info)('Check require_approved_review');
+            const hasReview = yield HelperApi.isReviewed(owner, repo, pullNumber, [], prUser);
+            if (!hasReview) {
+                throw new Error(`Pull request ${pullNumber} has not been approved.`);
+            }
+            (0, core_1.info)('Passed require_approved_review');
         }
         if (requireCodeTeamsFile || requireCodeTeamReview) {
             if (requireCodeTeamsFile) {
@@ -538,6 +546,7 @@ function run() {
             const requireCodeOwnerReview = JSON.parse((0, core_1.getInput)('require_code_owner_review', { required: true }).toLowerCase());
             const requireCodeTeamsFile = JSON.parse((0, core_1.getInput)('require_codeteams_file', { required: true }).toLowerCase());
             const requireCodeTeamReview = JSON.parse((0, core_1.getInput)('require_code_team_review', { required: true }).toLowerCase());
+            const requireApprovedReview = JSON.parse((0, core_1.getInput)('require_approved_review', { required: true }).toLowerCase());
             const requiredMergeableStateInput = (0, core_1.getInput)('required_mergeable_state', {
                 required: true
             });
@@ -556,6 +565,7 @@ function run() {
                 requireCodeOwnerReview,
                 requireCodeTeamsFile,
                 requireCodeTeamReview,
+                requireApprovedReview,
                 requiredMergeableState,
                 token
             });

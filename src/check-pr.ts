@@ -16,6 +16,7 @@ export const checkPullRequest = async ({
   requireCodeOwnerReview,
   requireCodeTeamsFile,
   requireCodeTeamReview,
+  requireApprovedReview,
   requiredMergeableState,
   token
 }: Readonly<{
@@ -25,6 +26,7 @@ export const checkPullRequest = async ({
   requireCodeOwnerReview: boolean
   requireCodeTeamsFile: boolean
   requireCodeTeamReview: boolean
+  requireApprovedReview: boolean
   requiredMergeableState: string[] | undefined
   token: string
 }>): Promise<void> => {
@@ -101,6 +103,19 @@ export const checkPullRequest = async ({
         )
       }
       info('Passed require_code_owner_review')
+    } else if (requireApprovedReview) {
+      info('Check require_approved_review')
+      const hasReview = await HelperApi.isReviewed(
+        owner,
+        repo,
+        pullNumber,
+        [],
+        prUser
+      )
+      if (!hasReview) {
+        throw new Error(`Pull request ${pullNumber} has not been approved.`)
+      }
+      info('Passed require_approved_review')
     }
     if (requireCodeTeamsFile || requireCodeTeamReview) {
       if (requireCodeTeamsFile) {

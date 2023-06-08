@@ -21,6 +21,9 @@ async function run(): Promise<void> {
     const requireCodeTeamReview = JSON.parse(
       getInput('require_code_team_review', {required: true}).toLowerCase()
     ) as boolean
+    const requireApprovedReview = JSON.parse(
+      getInput('require_approved_review', {required: true}).toLowerCase()
+    ) as boolean
     const requiredMergeableStateInput = getInput('required_mergeable_state', {
       required: true
     })
@@ -45,6 +48,7 @@ async function run(): Promise<void> {
       requireCodeOwnerReview,
       requireCodeTeamsFile,
       requireCodeTeamReview,
+      requireApprovedReview,
       requiredMergeableState,
       token
     })
