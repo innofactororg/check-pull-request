@@ -62,8 +62,7 @@ jobs:
         require_codeteams_file: false
 
         # Check that a code team member has reviewed and approved the pull request.
-        # The code team member can't be the user who opened the pull request, unless
-        # the user is the only team member.
+        # The code team member can't be the user who opened the pull request.
         #
         # For the check to run, the repository must have a CODETEAMS file in
         # either the root, docs/, or .github/ directory of the repository.
