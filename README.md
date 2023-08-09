@@ -1,4 +1,4 @@
-# Pull Request Check
+# Check Pull Request
 
 This action can be used to check a pull request before another action
 is allowed, like for example auto merge. It can be used in relation to
@@ -19,7 +19,7 @@ jobs:
       pull-requests: read
     steps:
     - name: Check Pull Request
-      uses: innofactororg/github-action-check-pull@v1
+      uses: innofactororg/check-pull-request@v1
       with:
         # Require a CODEOWNERS file.
         #
