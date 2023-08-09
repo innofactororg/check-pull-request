@@ -3,6 +3,8 @@ import {context} from '@actions/github'
 import {Octokit} from '@octokit/rest'
 import {Helper} from './helper'
 
+import fetch from 'node-fetch'
+
 interface CodeOwnerEntry {
   path: string
   owners: string[]
@@ -34,7 +36,10 @@ export const checkPullRequest = async ({
   const {actor} = context
   const octokit = new Octokit({
     auth: `token ${token || process.env.GITHUB_TOKEN}`,
-    baseUrl: 'https://api.github.com'
+    baseUrl: 'https://api.github.com',
+    request: {
+      fetch
+    }
   })
 
   const HelperApi = new Helper(octokit)
