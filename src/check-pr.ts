@@ -1,9 +1,9 @@
 import {info, notice} from '@actions/core'
 import {context} from '@actions/github'
 import {Octokit} from '@octokit/rest'
-import {Helper} from './helper'
-
 import fetch from 'node-fetch'
+
+import {Helper} from './helper'
 
 interface CodeOwnerEntry {
   path: string

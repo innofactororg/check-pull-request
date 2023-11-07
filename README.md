@@ -19,7 +19,7 @@ jobs:
       pull-requests: read
     steps:
     - name: Check Pull Request
-      uses: innofactororg/check-pull-request@v1
+      uses: innofactororg/check-pull-request@v2
       with:
         # Require a CODEOWNERS file.
         #

@@ -1,14 +1,28 @@
 {
-	"name": "Node.js & TypeScript",
-	"image": "mcr.microsoft.com/devcontainers/typescript-node:16-bullseye",
-	// Features to add to the dev container. More info: https://containers.dev/implementors/features.
-	// "features": {},
-	// Use 'forwardPorts' to make a list of ports inside the container available locally.
-	// "forwardPorts": [],
-	// Use 'postCreateCommand' to run commands after the container is created.
-	"postCreateCommand": "npm install"
-	// Configure tool-specific properties.
-	// "customizations": {},
-	// Uncomment to connect as root instead. More info: https://aka.ms/dev-containers-non-root.
-	// "remoteUser": "root"
+  "name": "Node.js & TypeScript",
+  "image": "mcr.microsoft.com/devcontainers/typescript-node:20-bookworm",
+  "onCreateCommand": ".devcontainer/setup.sh",
+  "postCreateCommand": "npm install",
+  "postStartCommand": ".devcontainer/startup.sh",
+  "overrideCommand": true,
+  "features": {
+    "ghcr.io/devcontainers-contrib/features/starship:1": {}
+  },
+  "customizations": {
+    "vscode": {
+      "settings": {
+        "security.workspace.trust.untrustedFiles": "open"
+      },
+      "extensions": [
+        "bierner.markdown-preview-github-styles",
+        "catppuccin.catppuccin-vsc",
+        "catppuccin.catppuccin-vsc-icons",
+        "dbaeumer.vscode-eslint",
+        "DavidAnson.vscode-markdownlint",
+        "GitHub.vscode-pull-request-github",
+        "streetsidesoftware.code-spell-checker",
+        "yzhang.markdown-all-in-one"
+      ]
+    }
+  }
 }
