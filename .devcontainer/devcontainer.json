@@ -19,6 +19,7 @@
         "catppuccin.catppuccin-vsc-icons",
         "dbaeumer.vscode-eslint",
         "DavidAnson.vscode-markdownlint",
+        "esbenp.prettier-vscode",
         "GitHub.vscode-pull-request-github",
         "streetsidesoftware.code-spell-checker",
         "yzhang.markdown-all-in-one"

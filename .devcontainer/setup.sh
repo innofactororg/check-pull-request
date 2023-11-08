@@ -15,10 +15,7 @@ fi
 
 sudo apt-get update
 sudo apt-get install --no-install-recommends -y pre-commit fonts-firacode shellcheck
-sudo npm install -g npm
-
-pre-commit install
-pre-commit autoupdate
+sudo npm install -g npm prettier
 
 if [ -f ~/.gitconfig ]; then
   rm ~/.gitconfig
@@ -31,6 +28,9 @@ fi
 chown -R $USER_UID:$USER_GID ~/.config
 chmod -R 700 ~/.config
 chown $USER_UID:$USER_GID ~/.config/starship.toml
-if [ -z $(cat ~/.zshrc | grep 'eval "$(starship init zsh)"') ]; then
+if ! [ -f ~/.zshrc ]; then
+  touch ~/.zshrc
+fi
+if ! grep -q 'eval "$(starship init zsh)"' ~/.zshrc; then
   echo 'eval "$(starship init zsh)"' >>~/.zshrc
 fi
