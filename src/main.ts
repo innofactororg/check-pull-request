@@ -2,7 +2,7 @@ import {getInput} from '@actions/core'
 import {context} from '@actions/github'
 
 import {checkPullRequest} from './check-pr'
-import {processError} from './helper'
+import {processError} from './error-tools'
 
 async function run(): Promise<void> {
   try {

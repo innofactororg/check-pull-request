@@ -1,10 +1,14 @@
 {
   "plugins": [
+    "import",
     "jest",
     "@typescript-eslint"
   ],
   "extends": [
-    "plugin:github/recommended"
+    "plugin:github/recommended",
+    "plugin:import/errors",
+    "plugin:import/warnings",
+    "plugin:import/typescript"
   ],
   "parser": "@typescript-eslint/parser",
   "parserOptions": {
@@ -12,10 +16,24 @@
     "sourceType": "module",
     "project": "./tsconfig.json"
   },
+  "settings": {
+    "import/parsers": {
+      "@typescript-eslint/parser": [".ts", ".tsx"]
+    },
+    "import/resolver": {
+      "node": {
+        "extensions": [".js", ".jsx", ".ts", ".tsx"]
+      },
+      "typescript": {
+        "alwaysTryTypes": true
+      }
+    }
+  },
   "rules": {
     "eslint-comments/no-use": "off",
     "import/no-namespace": "off",
     "import/named": "off",
+    "import/no-unresolved": "error",
     "i18n-text/no-en": "off",
     "no-unused-vars": "off",
     "@typescript-eslint/no-unused-vars": "error",
